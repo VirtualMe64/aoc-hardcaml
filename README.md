@@ -1,17 +1,17 @@
-# Advent of FPGA 2024 - Hardcaml Solutions
+# Advent of FPGA 2025 - Hardcaml Solutions
 
-This repository contains my solutions for [Jane Street's Advent of FPGA 2024](https://github.com/janestreet/advent-of-fpga-2024) challenge.
+This repository contains my solutions for [Jane Street's Advent of FPGA 2025](https://blog.janestreet.com/advent-of-fpga-challenge-2025/) challenge.
 
 ## About
 
-I have never used OCaml or Hardcaml before, though I do have some experience with other HDLs. I am using this challenge as an opportunity to learn both OCaml and the Hardcaml library.
+I have never used OCaml or Hardcaml before, though I do have some experience with other HDLs. I am using this challenge as an opportunity to learn both OCaml/Hardcaml and to improve my architecture skills.
 
 ## Project Layout
 
 The project is structured with each day's circuit in its own folder within `src/`.
 
 *   `src/DayX/`: Contains the solution for Day X.
-    *   `hardware.ml`: The actual hardware implementation of the circuit.
+    *   `hardware.ml`: The actual hardware implementation of the circuit. Also includes tests for the circuit
     *   `main.ml`: Handles input parsing and runs the hardware simulation against the input.
 *   `inputs/`: Contains the input files for the challenges.
 
@@ -19,12 +19,12 @@ The project is structured with each day's circuit in its own folder within `src/
 
 ### Day 1
 
-The Day 1 solution implements a state machine with two states: `ReadyForInput` and `Processing`.
+My Day 1 solution implements a state machine with two states: `ReadyForInput` and `Processing`.
 
 *   **ReadyForInput**: The circuit waits for a valid input signal. When received, it latches the `amount` and `direction` and transitions to `Processing`.
 *   **Processing**: The circuit updates the rotation based on the direction.
     *   **Large Numbers**: To handle amounts larger than 100, the circuit subtracts 100 from the amount in each cycle until it is within range.
-    *   **Counters**: It maintains counters for Part 1 and Part 2, incrementing them based on the rotation and overflow conditions.
+    *   **Counters**: I maintain counters for Part 1 and Part 2, incrementing them based on the rotation and overflow conditions.
 
 ## Usage
 
