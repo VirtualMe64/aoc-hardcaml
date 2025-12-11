@@ -23,6 +23,7 @@ let add_op d amount = let max_without_overflow = (of_int ~width:8 99) -: amount 
   mux2 (d >: max_without_overflow) (* if sum would be >= 100 *)
     (d +: amount -: of_int ~width:8 100)
     (d +: amount)
+
 let sub_op d amount =
   mux2 (d <: amount) (* if subtraction would be negative *)
     (d +: of_int ~width:8 100 -: amount)
@@ -56,6 +57,33 @@ let create (i : _ I.t) =
 
 module Simulator = Cyclesim.With_interface(I)(O)
 
+
+let testbench input =
+  let sim = Simulator.create create in
+  let inputs : _ I.t = Cyclesim.inputs sim in
+  let outputs : _ O.t = Cyclesim.outputs sim in
+  (* Perform a clock cycle.  Apply the given values to [incr] and [clear].
+      Printf the current values of [dout]. *)
+
+  (* Reset simulation *)
+  inputs.dir := Bits.gnd;
+  inputs.amount := Bits.of_int ~width:8 0;
+  inputs.reset := Bits.vdd;
+  Cyclesim.cycle sim;
+
+  Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
+  let step ~dir ~amount =
+    inputs.dir := if dir then Bits.vdd else Bits.gnd;
+    inputs.amount := Bits.of_int ~width:8 amount;
+    inputs.reset := Bits.gnd;
+    Cyclesim.cycle sim;
+    Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
+
+  in
+  (* Run the counter for 6 clock cycles. *)
+  List.iter (fun (dir, amount) -> step ~dir ~amount) input;
+;;
+
 let test_input = [
   (false, 68);
   (false, 30);
@@ -69,29 +97,9 @@ let test_input = [
   (false, 82);
 ]
 
-let%expect_test "testbench" =
+let%expect_test "test small numbers" =
     (* Construct the simulation and get its input and output ports. *)
-    let sim = Simulator.create create in
-    let inputs : _ I.t = Cyclesim.inputs sim in
-    let outputs : _ O.t = Cyclesim.outputs sim in
-    (* Perform a clock cycle.  Apply the given values to [incr] and [clear].
-       Printf the current values of [dout]. *)
-
-    (* Reset simulation *)
-    inputs.dir := Bits.gnd;
-    inputs.amount := Bits.of_int ~width:8 0;
-    inputs.reset := Bits.vdd;
-    Cyclesim.cycle sim;
-
-    let step ~dir ~amount =
-      inputs.dir := if dir then Bits.vdd else Bits.gnd;
-      inputs.amount := Bits.of_int ~width:8 amount;
-      inputs.reset := Bits.gnd;
-      Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
-      Cyclesim.cycle sim
-    in
-    (* Run the counter for 6 clock cycles. *)
-    List.iter (fun (dir, amount) -> step ~dir ~amount) test_input;
+    testbench test_input;
     [%expect {|
       rotation='50', count='0'
       rotation='82', count='0'
@@ -103,4 +111,5 @@ let%expect_test "testbench" =
       rotation='99', count='2'
       rotation='0', count='2'
       rotation='14', count='3'
+      rotation='32', count='3'
       |}]
