@@ -16,7 +16,8 @@ end
 module O = struct
   type 'a t =
     { ready : 'a (* whether output is valid/ready to receive input *)
-    ; count : 'a[@bits 64]
+    ; part1_count : 'a[@bits 64]
+    ; part2_count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -97,7 +98,7 @@ let construct_processor_file n ~clock ~clear ~new_input ~valid ~number ~remainin
     valid = if idx == 0 then valid else (List.hd acc).Processor.O.valid;
     number = if idx == 0 then number else (List.hd acc).Processor.O.number;
     min_index = if idx == 0 then mux2
-        (remaining >:. 11) (of_int ~width:4 0) ((of_int ~width:4 11) -: select remaining 3 0)
+        (remaining >:. (n - 1)) (of_int ~width:4 0) ((of_int ~width:4 (n - 1)) -: select remaining 3 0)
       else
         (List.hd acc).Processor.O.min_index;
     zeroing = if idx == 0 then gnd else (List.hd acc).Processor.O.zeroing;
@@ -108,7 +109,8 @@ let construct_processor_file n ~clock ~clear ~new_input ~valid ~number ~remainin
 (* streaming processor *)
 (* inputs passed between *)
 let create (i : _ I.t) =
-    let processor_file = construct_processor_file 12
+    (* part 1 processors *)
+    let p1_processor_file = construct_processor_file 2
       ~clock:i.clock
       ~clear:i.clear
       ~new_input:i.new_input
@@ -116,21 +118,44 @@ let create (i : _ I.t) =
       ~number:i.number
       ~remaining:i.remaining
     in
-    let ready_signal = ~: (List.fold_left (fun acc p -> acc |: p.Processor.O.valid) gnd processor_file) in
-    let result_signal = bcd_file_to_int_signal (List.map (fun p -> p.Processor.O.value) processor_file) 12 in
-    let ready_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:1
-      ~f:(fun _ -> ready_signal)
+    let p1_ready_signal = ~: (List.fold_left (fun acc p -> acc |: p.Processor.O.valid) gnd p1_processor_file) in
+    let p1_result_signal = bcd_file_to_int_signal (List.map (fun p -> p.Processor.O.value) p1_processor_file) 2 in
+    let p1_ready_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:1
+      ~f:(fun _ -> p1_ready_signal)
     in
-    let rising_edge = ready_signal &: ~:ready_reg in
-    let count_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:64
+    let rising_edge = p1_ready_signal &: ~:p1_ready_reg in
+    let p1_count_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:64
       ~f:(fun v -> mux2
         rising_edge
-        (v +: uresize result_signal 64)
+        (v +: uresize p1_result_signal 64)
         v
       )
     in
-    { O.ready = ready_reg
-    ; O.count = count_reg
+    (* part 2 processors *)
+    let p2_processor_file = construct_processor_file 12
+      ~clock:i.clock
+      ~clear:i.clear
+      ~new_input:i.new_input
+      ~valid:i.valid
+      ~number:i.number
+      ~remaining:i.remaining
+    in
+    let p2_ready_signal = ~: (List.fold_left (fun acc p -> acc |: p.Processor.O.valid) gnd p2_processor_file) in
+    let p2_result_signal = bcd_file_to_int_signal (List.map (fun p -> p.Processor.O.value) p2_processor_file) 12 in
+    let p2_ready_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:1
+      ~f:(fun _ -> p2_ready_signal)
+    in
+    let rising_edge = p2_ready_signal &: ~:p2_ready_reg in
+    let p2_count_reg = reg_fb (Reg_spec.create ~clock:i.clock ~clear:i.clear () ) ~enable:vdd ~width:64
+      ~f:(fun v -> mux2
+        rising_edge
+        (v +: uresize p2_result_signal 64)
+        v
+      )
+    in
+    { O.ready = p1_ready_reg &: p2_ready_reg
+    ; O.part1_count = p1_count_reg
+    ; O.part2_count = p2_count_reg
     }
 ;;
 
@@ -175,10 +200,10 @@ let testbench input verbose =
       (* Stdio.printf "result=%d\n" (bcd_to_int (Bits.to_int !(outputs.result_bcd))); *)
     done;
     if verbose then
-      Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count));
+      Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   in
   List.iter (fun line -> stream ~number:line) input;
-  Stdio.printf "part2_count=%d\n" (Bits.to_int !(outputs.count));
+  Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
@@ -193,10 +218,10 @@ let%expect_test "test small numbers" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      count=987654321111
-      count=1798765432230
-      count=2232999666508
-      count=3121910778619
-      part2_count=3121910778619
+      part1_count=98, part2_count=987654321111
+      part1_count=187, part2_count=1798765432230
+      part1_count=265, part2_count=2232999666508
+      part1_count=357, part2_count=3121910778619
+      part1_count=357, part2_count=3121910778619
       Total cycles: 116
       |}]

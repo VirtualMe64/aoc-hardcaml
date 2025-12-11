@@ -19,29 +19,23 @@ The project is structured with each day's circuit in its own folder within `src/
 
 ### Day 1
 
-My Day 1 solution implements a state machine with two states: `ReadyForInput` and `Processing`.
-
-*   **ReadyForInput**: The circuit waits for a valid input signal. When received, it latches the `amount` and `direction` and transitions to `Processing`.
-*   **Processing**: The circuit updates the rotation based on the direction.
-    *   **Large Numbers**: To handle amounts larger than 100, the circuit subtracts 100 from the amount in each cycle until it is within range.
-    *   **Counters**: I maintain counters for Part 1 and Part 2, incrementing them based on the rotation and overflow conditions.
-
-I originally tried to solve this without a state machine, but without a mod operation I couldn't think of another way to handle numbers greater than 100, and switched to an approach where I can use multiple cycles per input (via ready and valid signals).
+This was my first time making any non-trivial Hardcaml circuit, so I spent a lot of time getting the basics of file format, structure, and testing working. My initial approach only handled numbers in the range [0, 200], and took a single cycle for each input. To make it work with larger inputs, I switched to a state machine and repeated subtracted 100 until it's in this range. Short of implementing modular arithmetic, I'm happy with this solution.
 
 **Performance**: Executes in 12208 cycles (~2.93 per input line).
 
 ### Day 2
 
-My Day 2 solution uses a state machine to process the input numbers:
+I used a multiphase approach for day two. After reciving the input, I extract the decimal digits using the Double Dabble algorithm, check for equality among all relevant sets of chunks, and then increment with a ripple add operation.
 
-*   **Waiting**: The circuit waits for input.
-*   **Extracting Digits**: Uses the Double Dabble algorithm to extract decimal digits.
-*   **Checking Equality**: Checks each possible chunk size to see if the digits are repeating.
-*   **Incrementing**: Performs a ripple add operation.
-
-Implement the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These would all be computed in parallel in hardware, then a mux with the number of digits is used to get the result.
+Implementing the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These would all be computed in parallel in hardware, then a mux with the number of digits is used to get the result.
 
 **Performance**: Takes 4963923 cycles (~2.00 per number checked).
+
+## Day 3
+
+This is my favorite circuit so far by a good margin. My reference python implementation iterated over each of the output digits for each input character, which would be somewhat inefficient and didn't feel in the spirit of an FPGA. Instead, I initialize a processor for each digit, and the characters are passed through them from the MSB to the LSB. This means with sufficiently long input strings we'd approach one cycle per character!
+
+I'm also quite happy with how this approach generalized -- part 1 and part 2 use the same exact approach, part 1 with a chain of 2 processors and part 2 with a chain of 12.
 
 ## Usage
 
