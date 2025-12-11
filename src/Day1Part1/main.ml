@@ -12,7 +12,7 @@ let testbench input =
 
   (* Reset simulation *)
   inputs.dir := Bits.gnd;
-  inputs.amount := Bits.of_int ~width:8 0;
+  inputs.amount := Bits.of_int ~width:16 0;
   inputs.clear := Bits.vdd;
   inputs.valid := Bits.gnd;
   Cyclesim.cycle sim;
@@ -21,14 +21,14 @@ let testbench input =
     (* wait for input to be available *)
     while not (Bits.to_bool !(outputs.ready)) do
       inputs.dir := Bits.gnd;
-      inputs.amount := Bits.of_int ~width:8 0;
+      inputs.amount := Bits.of_int ~width:16 0;
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
       Cyclesim.cycle sim;
     done;
     (* provide input *)
     inputs.dir := if dir then Bits.vdd else Bits.gnd;
-    inputs.amount := Bits.of_int ~width:8 amount;
+    inputs.amount := Bits.of_int ~width:16 amount;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     Cyclesim.cycle sim;
@@ -38,7 +38,7 @@ let testbench input =
   (* allow processing of final element *)
   while not (Bits.to_bool !(outputs.ready)) do
     inputs.dir := Bits.gnd;
-    inputs.amount := Bits.of_int ~width:8 0;
+    inputs.amount := Bits.of_int ~width:16 0;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.gnd;
     Cyclesim.cycle sim;
@@ -58,7 +58,7 @@ let parse_line line =
   (dir, amount)
 ;;
 
-Stdio.printf "Expecting output: 1021\n"
+Stdio.printf "Expecting: count=1021\n"
 let file = "inputs/day1.txt"
 let content = In_channel.with_open_text file In_channel.input_lines
 let () = testbench (List.map parse_line content)

@@ -6,7 +6,7 @@ module I = struct
     { clock : 'a
     ; clear : 'a
     ; dir : 'a
-    ; amount : 'a[@bits 8]
+    ; amount : 'a[@bits 16]
     ; valid : 'a
     }
   [@@deriving hardcaml]
@@ -15,8 +15,8 @@ end
 module O = struct
   type 'a t =
     { ready : 'a (* whether ready to receive input *)
-    ; rotation : 'a[@bits 8]
-    ; count: 'a[@bits 8]
+    ; rotation : 'a[@bits 16]
+    ; count: 'a[@bits 16]
     }
   [@@deriving hardcaml]
 end
@@ -30,29 +30,29 @@ end
 
 (* returns new value (for rotation/amount) and whether there was overflow *)
 let add_op rotation amount = 
-  let gt_100 = amount >: (of_int ~width:8 100) in
-  let overflow = rotation >=: (of_int ~width:8 100 -: amount) in
+  let gt_100 = amount >: (of_int ~width:16 100) in
+  let overflow = rotation >=: (of_int ~width:16 100 -: amount) in
   (
     mux2 gt_100 rotation
       (mux2 overflow
-        (rotation +: amount -: of_int ~width:8 100) 
+        (rotation +: amount -: of_int ~width:16 100) 
         (rotation +: amount)
       ),
-    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:8 100)) amount,
+    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:16 100)) amount,
     overflow
   )
 ;;
 
 let sub_op rotation amount =
-  let gt_100 = amount >: (of_int ~width:8 100) in
+  let gt_100 = amount >: (of_int ~width:16 100) in
   let overflow = rotation <: amount in (* if subtracting would be negative *)
   (
     mux2 gt_100 rotation
       (mux2 overflow
-        (rotation +: of_int ~width:8 100 -: amount)
+        (rotation +: of_int ~width:16 100 -: amount)
         (rotation -: amount)
       ),
-    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:8 100)) amount,
+    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:16 100)) amount,
     overflow
   )
 ;;
@@ -60,11 +60,11 @@ let sub_op rotation amount =
 let create (i : _ I.t) =
     let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
     let sm = Always.State_machine.create (module States) ~enable:vdd r_sync in
-    let amount_reg = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
+    let amount_reg = Always.Variable.reg ~width:16 ~enable:vdd r_sync in
     let direction_reg = Always.Variable.reg ~width:1 ~enable:vdd r_sync in 
-    let rotation_reg = Always.Variable.reg ~width:8 ~enable:vdd
-      (Reg_spec.override ~clear_to:(of_int ~width:8 50) r_sync) in (* start at 50 *)
-    let counter_reg = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
+    let rotation_reg = Always.Variable.reg ~width:16 ~enable:vdd
+      (Reg_spec.override ~clear_to:(of_int ~width:16 50) r_sync) in (* start at 50 *)
+    let counter_reg = Always.Variable.reg ~width:16 ~enable:vdd r_sync in
     Always.(
       compile [
         sm.switch [
@@ -81,11 +81,11 @@ let create (i : _ I.t) =
           let next_rot = mux2 direction_reg.value add_rot sub_rot in
           let next_amt = mux2 direction_reg.value add_amt sub_amt in
           let _overflow = mux2 direction_reg.value add_overflow sub_overflow in
-          let gt_100 = amount_reg.value >: (of_int ~width:8 100) in
+          let gt_100 = amount_reg.value >: (of_int ~width:16 100) in
           [ rotation_reg <-- next_rot
           ; amount_reg <-- next_amt
-          ; when_ ((next_rot ==: of_int ~width:8 0) &: (~: gt_100)) [
-            counter_reg <-- counter_reg.value +: of_int ~width:8 1
+          ; when_ ((next_rot ==: of_int ~width:16 0) &: (~: gt_100)) [
+            counter_reg <-- counter_reg.value +: of_int ~width:16 1
           ]
           ; when_ (~: gt_100) [
              sm.set_next ReadyForInput
@@ -109,7 +109,7 @@ let testbench input =
 
   (* Reset simulation *)
   inputs.dir := Bits.gnd;
-  inputs.amount := Bits.of_int ~width:8 0;
+  inputs.amount := Bits.of_int ~width:16 0;
   inputs.clear := Bits.vdd;
   inputs.valid := Bits.gnd;
   Cyclesim.cycle sim;
@@ -118,14 +118,14 @@ let testbench input =
     (* wait for input to be available *)
     while not (Bits.to_bool !(outputs.ready)) do
       inputs.dir := Bits.gnd;
-      inputs.amount := Bits.of_int ~width:8 0;
+      inputs.amount := Bits.of_int ~width:16 0;
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
       Cyclesim.cycle sim;
     done;
     (* provide input *)
     inputs.dir := if dir then Bits.vdd else Bits.gnd;
-    inputs.amount := Bits.of_int ~width:8 amount;
+    inputs.amount := Bits.of_int ~width:16 amount;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     Cyclesim.cycle sim;
@@ -135,7 +135,7 @@ let testbench input =
   (* allow processing of final element *)
   while not (Bits.to_bool !(outputs.ready)) do
     inputs.dir := Bits.gnd;
-    inputs.amount := Bits.of_int ~width:8 0;
+    inputs.amount := Bits.of_int ~width:16 0;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.gnd;
     Cyclesim.cycle sim;
