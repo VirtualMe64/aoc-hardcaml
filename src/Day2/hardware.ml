@@ -26,6 +26,7 @@ module States = struct
     | ExtractingDigits1
     | ExtractingDigits2
     | CheckingEquality
+    | Incrementing
   [@@deriving sexp_of, compare ~localize, enumerate]
 end
 
@@ -106,14 +107,22 @@ let create (i : _ I.t) =
           let by_length = equality_by_length dcb_regfile.value in
           [ when_ is_even_length [
             when_ (mux (half_length -:. 1) by_length) [
-              counter_reg <-- counter_reg.value +:. 1
+              counter_reg <-- counter_reg.value +: curr_reg.value;
             ]
           ]
-          ; curr_reg <-- curr_reg.value +:. 1
-          ; when_ (curr_reg.value >=: upper_reg.value) [
-             sm.set_next ReadyForInput
+          ; if_ (curr_reg.value >=: upper_reg.value) [
+            sm.set_next ReadyForInput
+          ] [
+            sm.set_next Incrementing
           ]
-          ])
+          ]);
+          (Incrementing,
+          
+          [
+            curr_reg <-- curr_reg.value +:. 1
+          ; sm.set_next ExtractingDigits1
+          ]
+          )
     ]]);
     { O.count = counter_reg.value
     ; O.ready = sm.is States.ReadyForInput
@@ -123,6 +132,7 @@ let create (i : _ I.t) =
 module Simulator = Cyclesim.With_interface(I)(O)
 
 let testbench input verbose =
+  let cycle_count = ref 0 in
   let sim = Simulator.create create in
   let inputs : _ I.t = Cyclesim.inputs sim in
   let outputs : _ O.t = Cyclesim.outputs sim in
@@ -143,6 +153,7 @@ let testbench input verbose =
       inputs.upper := Bits.of_int ~width:32 0;
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
+      cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
     done;
     (* provide input *)
@@ -150,6 +161,7 @@ let testbench input verbose =
     inputs.upper := Bits.of_int ~width:32 upper;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
+    cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
     if verbose then
       Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count));
@@ -161,9 +173,11 @@ let testbench input verbose =
     inputs.upper := Bits.of_int ~width:32 0;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.gnd;
+    cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
   done;
   Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count));
+  Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
 let test_input = [
@@ -185,8 +199,18 @@ let%expect_test "test small numbers" =
     testbench test_input true;
     [%expect {|
       count=0
-      count=12
-      count=12
+      count=33
+      count=132
+      count=1142
+      count=1188513027
+      count=1188735249
+      count=1188735249
+      count=1189181695
+      count=1227775554
+      count=1227775554
+      count=1227775554
+      count=1227775554
+      Total cycles: 3710
       |}]
 
 let%expect_test "equality_by_length test" =
