@@ -1,5 +1,5 @@
 open Hardcaml
-open Hardware
+open Hardware_day1.Hardware
 
 module Simulator = Cyclesim.With_interface(I)(O)
 
