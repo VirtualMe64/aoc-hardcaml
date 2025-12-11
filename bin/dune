@@ -1,0 +1,4 @@
+(executable
+ (public_name aoc-hardcaml)
+ (name main)
+ (libraries aoc_hardcaml))
