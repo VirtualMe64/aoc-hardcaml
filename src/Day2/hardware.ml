@@ -50,6 +50,14 @@ let add_and_shift dcb_value =
 
 let dcb_length s = srl ((of_int ~width:7 64) -: (select (leading_zeros s) 6 0) +:. 3) 2
 
+let equality_by_length s = 
+  List.init 8 (fun len ->
+    let first_half = select s (len * 4 + 3) 0 in
+    let second_half = select s (len * 8 + 7) (len * 4 + 4) in
+    first_half ==: second_half
+  )
+;;
+
 (* first extract the base 10 digits into digit_regfile with double dabble *)
 (* check for equality with length check + concat + xor *)
 (* increment efficiently by scanning *)
@@ -92,17 +100,22 @@ let create (i : _ I.t) =
             ]
           ]
           );
-          (CheckingEquality, 
-          [ curr_reg <-- curr_reg.value +:. 1
-          ; when_ (dcb_length dcb_regfile.value ==:. 2) [
-            counter_reg <-- counter_reg.value +:. 1
+          (CheckingEquality,
+          let is_even_length = (lsb (dcb_length dcb_regfile.value)) ==:. 0 in
+          let half_length = srl (dcb_length dcb_regfile.value) 1 in
+          let by_length = equality_by_length dcb_regfile.value in
+          [ when_ is_even_length [
+            when_ (mux (half_length -:. 1) by_length) [
+              counter_reg <-- counter_reg.value +:. 1
+            ]
           ]
+          ; curr_reg <-- curr_reg.value +:. 1
           ; when_ (curr_reg.value >=: upper_reg.value) [
              sm.set_next ReadyForInput
           ]
           ])
     ]]);
-    { (*O.count = counter_reg.value*) O.count = sresize (dcb_length dcb_regfile.value) 32
+    { O.count = counter_reg.value
     ; O.ready = sm.is States.ReadyForInput
     }
 ;;
@@ -172,15 +185,23 @@ let%expect_test "test small numbers" =
     testbench test_input true;
     [%expect {|
       count=0
-      count=17
-      count=149
-      count=2456
-      count=2287016064
-      count=2236960
-      count=23692578
-      count=4482115
-      count=945371222
-      count=5658195
-      count=612517921
-      count=555819288
+      count=12
+      count=12
       |}]
+
+let%expect_test "equality_by_length test" =
+  let s = of_int ~width:64 0b0000_0000_0000_0000_0000_0000_0000_0000_0000_1111_1111_1111_0000_1111_1111_1111 in
+  let results = equality_by_length s in
+  List.iteri (fun i res ->
+    Stdio.printf "Length %d equality: %b\n" (i + 1) (Signal.to_bool res)
+  ) results;
+  [%expect {|
+    Length 1 equality: true
+    Length 2 equality: false
+    Length 3 equality: false
+    Length 4 equality: true
+    Length 5 equality: false
+    Length 6 equality: false
+    Length 7 equality: false
+    Length 8 equality: false
+    |}]
