@@ -59,6 +59,21 @@ let equality_by_length s =
   )
 ;;
 
+let dcb_ripple_incr s =
+    let chunks = 
+      List.init 16 (fun i ->
+        select s (i * 4 + 3) (i * 4)  
+      ) 
+    in
+    List.fold_left (fun (carry, acc) chunk ->
+      let sum = chunk +: carry in
+      let new_chunk = mux2 (sum >:. 9) (of_int ~width:4 0) sum in
+      let new_carry = mux2 (sum >:. 9) (of_int ~width:4 1) (of_int ~width:4 0) in
+      (new_carry, acc @ [new_chunk])
+    ) (of_int ~width:4 1, []) chunks
+    |> snd |> concat_lsb
+;;
+
 (* first extract the base 10 digits into digit_regfile with double dabble *)
 (* check for equality with length check + concat + xor *)
 (* increment efficiently by scanning *)
@@ -117,10 +132,10 @@ let create (i : _ I.t) =
           ]
           ]);
           (Incrementing,
-          
           [
             curr_reg <-- curr_reg.value +:. 1
-          ; sm.set_next ExtractingDigits1
+          ; dcb_regfile <-- dcb_ripple_incr dcb_regfile.value
+          ; sm.set_next CheckingEquality
           ]
           )
     ]]);
@@ -210,7 +225,7 @@ let%expect_test "test small numbers" =
       count=1227775554
       count=1227775554
       count=1227775554
-      Total cycles: 3710
+      Total cycles: 575
       |}]
 
 let%expect_test "equality_by_length test" =
@@ -228,4 +243,14 @@ let%expect_test "equality_by_length test" =
     Length 6 equality: false
     Length 7 equality: false
     Length 8 equality: false
+    |}]
+
+let%expect_test "dcb_ripple_increment test" = 
+  let s = of_int ~width:64 0b0000_0000_0000_0000_0000_0000_0000_0000_0001_0010_0011_0100_0101_0110_0111_1001 in
+  let incremented = dcb_ripple_incr s in
+  Stdio.printf "Before: %s\n" (to_bstr s);
+  Stdio.printf "After : %s\n" (to_bstr incremented);
+  [%expect {|
+    Before: 0000000000000000000000000000000000010010001101000101011001111001
+    After : 0000000000000000000000000000000000010010001101000101011010000000
     |}]
