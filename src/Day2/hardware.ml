@@ -48,6 +48,8 @@ let add_and_shift dcb_value =
   shifted_result
 ;;
 
+let dcb_length s = srl ((of_int ~width:7 64) -: (select (leading_zeros s) 6 0) +:. 3) 2
+
 (* first extract the base 10 digits into digit_regfile with double dabble *)
 (* check for equality with length check + concat + xor *)
 (* increment efficiently by scanning *)
@@ -59,7 +61,6 @@ let create (i : _ I.t) =
     let upper_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
     let dcb_right = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
     let dcb_regfile = Always.Variable.reg ~width:(16 * 4) ~enable:vdd r_sync in
-    let dcb_length = Always.Variable.reg ~width:5 ~enable:vdd r_sync in
     let dcb_timer = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
     let counter_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
 
@@ -76,7 +77,6 @@ let create (i : _ I.t) =
           (ExtractingDigits1,
           [ dcb_right <-- curr_reg.value
           ; dcb_regfile <--. 0
-          ; dcb_length <--. 0
           ; dcb_timer <--. 0
           ; sm.set_next ExtractingDigits2
           ]
@@ -88,14 +88,13 @@ let create (i : _ I.t) =
           ; dcb_right <-- sll dcb_right.value 1
           ; dcb_timer <-- dcb_timer.value +:. 1
           ; when_ (dcb_timer.value ==:. 31) [
-              dcb_length <-- srl ((of_int ~width:5 64) -: (select (leading_zeros new_dcb) 4 0) +:. 3) 2
-            ; sm.set_next CheckingEquality
+              sm.set_next CheckingEquality
             ]
           ]
           );
           (CheckingEquality, 
           [ curr_reg <-- curr_reg.value +:. 1
-          ; when_ (dcb_length.value ==:. 2) [
+          ; when_ (dcb_length dcb_regfile.value ==:. 2) [
             counter_reg <-- counter_reg.value +:. 1
           ]
           ; when_ (curr_reg.value >=: upper_reg.value) [
@@ -103,7 +102,7 @@ let create (i : _ I.t) =
           ]
           ])
     ]]);
-    { (*O.count = counter_reg.value*) O.count = select dcb_regfile.value 31 0
+    { (*O.count = counter_reg.value*) O.count = sresize (dcb_length dcb_regfile.value) 32
     ; O.ready = sm.is States.ReadyForInput
     }
 ;;
@@ -158,14 +157,14 @@ let test_input = [
   (11, 22);
   (95, 115);
   (998, 1012);
-  (* (1188511880, 1188511890);
+  (1188511880, 1188511890);
   (222220, 222224);
   (1698522, 1698528);
   (446443, 446449);
   (38593856, 38593862);
   (565653, 565659);
   (824824821, 824824827);
-  (2121212118, 2121212124); *)
+  (2121212118, 2121212124);
 ]
 
 let%expect_test "test small numbers" =
@@ -176,4 +175,12 @@ let%expect_test "test small numbers" =
       count=17
       count=149
       count=2456
+      count=2287016064
+      count=2236960
+      count=23692578
+      count=4482115
+      count=945371222
+      count=5658195
+      count=612517921
+      count=555819288
       |}]
