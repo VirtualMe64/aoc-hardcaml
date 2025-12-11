@@ -16,7 +16,7 @@ let test_input = [
   (false, 82);
 ]
 
-let testbench () =
+let testbench input =
   let sim = Simulator.create create in
   let inputs : _ I.t = Cyclesim.inputs sim in
   let outputs : _ O.t = Cyclesim.outputs sim in
@@ -26,20 +26,37 @@ let testbench () =
   (* Reset simulation *)
   inputs.dir := Bits.gnd;
   inputs.amount := Bits.of_int ~width:8 0;
-  inputs.reset := Bits.vdd;
+  inputs.clear := Bits.vdd;
+  inputs.valid := Bits.gnd;
   Cyclesim.cycle sim;
 
-  Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
-
   let step ~dir ~amount =
+    (* wait for input to be available *)
+    while not (Bits.to_bool !(outputs.ready)) do
+      inputs.dir := Bits.gnd;
+      inputs.amount := Bits.of_int ~width:8 0;
+      inputs.clear := Bits.gnd;
+      inputs.valid := Bits.gnd;
+      Cyclesim.cycle sim;
+    done;
+    (* provide input *)
     inputs.dir := if dir then Bits.vdd else Bits.gnd;
     inputs.amount := Bits.of_int ~width:8 amount;
-    inputs.reset := Bits.gnd;
+    inputs.clear := Bits.gnd;
+    inputs.valid := Bits.vdd;
     Cyclesim.cycle sim;
-    Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count))
+    Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
   in
-  (* Run the counter for 6 clock cycles. *)
-  List.iter (fun (dir, amount) -> step ~dir ~amount) test_input;
+  List.iter (fun (dir, amount) -> step ~dir ~amount) input;
+  (* allow processing of final element *)
+  while not (Bits.to_bool !(outputs.ready)) do
+    inputs.dir := Bits.gnd;
+    inputs.amount := Bits.of_int ~width:8 0;
+    inputs.clear := Bits.gnd;
+    inputs.valid := Bits.gnd;
+    Cyclesim.cycle sim;
+  done;
+  Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
 ;;
 
-let () = testbench ()
+let () = testbench test_input
