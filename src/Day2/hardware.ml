@@ -5,8 +5,8 @@ module I = struct
   type 'a t =
     { clock : 'a
     ; clear : 'a
-    ; lower : 'a[@bits 32]
-    ; upper : 'a[@bits 32]
+    ; lower : 'a[@bits 64]
+    ; upper : 'a[@bits 64]
     ; valid : 'a
     }
   [@@deriving hardcaml]
@@ -15,7 +15,7 @@ end
 module O = struct
   type 'a t =
     { ready : 'a (* whether ready to receive input *)
-    ; count : 'a[@bits 32]
+    ; count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -81,12 +81,12 @@ let dcb_ripple_incr s =
 let create (i : _ I.t) =
     let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
     let sm = Always.State_machine.create (module States) ~enable:vdd r_sync in
-    let curr_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
-    let upper_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
-    let dcb_right = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
+    let curr_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+    let upper_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+    let dcb_right = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
     let dcb_regfile = Always.Variable.reg ~width:(16 * 4) ~enable:vdd r_sync in
     let dcb_timer = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
-    let counter_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
+    let counter_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
 
     Always.(
       compile [
@@ -111,7 +111,7 @@ let create (i : _ I.t) =
           [ dcb_regfile <-- new_dcb
           ; dcb_right <-- sll dcb_right.value 1
           ; dcb_timer <-- dcb_timer.value +:. 1
-          ; when_ (dcb_timer.value ==:. 31) [
+          ; when_ (dcb_timer.value ==:. 63) [
               sm.set_next CheckingEquality
             ]
           ]
@@ -155,8 +155,8 @@ let testbench input verbose =
       Printf the current values of [dout]. *)
 
   (* Reset simulation *)
-  inputs.lower := Bits.of_int ~width:32 0;
-  inputs.upper := Bits.of_int ~width:32 0;
+  inputs.lower := Bits.of_int ~width:64 0;
+  inputs.upper := Bits.of_int ~width:64 0;
   inputs.clear := Bits.vdd;
   inputs.valid := Bits.gnd;
   Cyclesim.cycle sim;
@@ -164,16 +164,16 @@ let testbench input verbose =
   let step ~lower ~upper =
     (* wait for input to be available *)
     while not (Bits.to_bool !(outputs.ready)) do
-      inputs.lower := Bits.of_int ~width:32 0;
-      inputs.upper := Bits.of_int ~width:32 0;
+      inputs.lower := Bits.of_int ~width:64 0;
+      inputs.upper := Bits.of_int ~width:64 0;
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
       cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
     done;
     (* provide input *)
-    inputs.lower := Bits.of_int ~width:32 lower;
-    inputs.upper := Bits.of_int ~width:32 upper;
+    inputs.lower := Bits.of_int ~width:64 lower;
+    inputs.upper := Bits.of_int ~width:64 upper;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     cycle_count := !cycle_count + 1;
@@ -184,8 +184,8 @@ let testbench input verbose =
   List.iter (fun (lower, upper) -> step ~lower ~upper) input;
   (* allow processing of final element *)
   while not (Bits.to_bool !(outputs.ready)) do
-    inputs.lower := Bits.of_int ~width:32 0;
-    inputs.upper := Bits.of_int ~width:32 0;
+    inputs.lower := Bits.of_int ~width:64 0;
+    inputs.upper := Bits.of_int ~width:64 0;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.gnd;
     cycle_count := !cycle_count + 1;

@@ -108,6 +108,7 @@ let create (i : _ I.t) =
 module Simulator = Cyclesim.With_interface(I)(O)
 
 let testbench input verbose =
+  let cycle_count = ref 0 in
   let sim = Simulator.create create in
   let inputs : _ I.t = Cyclesim.inputs sim in
   let outputs : _ O.t = Cyclesim.outputs sim in
@@ -128,6 +129,7 @@ let testbench input verbose =
       inputs.amount := Bits.of_int ~width:16 0;
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
+      cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
     done;
     (* provide input *)
@@ -135,6 +137,7 @@ let testbench input verbose =
     inputs.amount := Bits.of_int ~width:16 amount;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
+    cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
     if verbose then
       Stdio.printf "rotation=%d, part1=%d, part2=%d\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
@@ -146,9 +149,11 @@ let testbench input verbose =
     inputs.amount := Bits.of_int ~width:16 0;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.gnd;
+    cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
   done;
   Stdio.printf "rotation=%d, part1=%d, part2=%d\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
+  Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
 let test_input = [

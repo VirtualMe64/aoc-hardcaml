@@ -26,6 +26,19 @@ My Day 1 solution implements a state machine with two states: `ReadyForInput` an
     *   **Large Numbers**: To handle amounts larger than 100, the circuit subtracts 100 from the amount in each cycle until it is within range.
     *   **Counters**: I maintain counters for Part 1 and Part 2, incrementing them based on the rotation and overflow conditions.
 
+**Performance**: Executes in 12208 cycles (~2.93 per input line).
+
+### Day 2
+
+My Day 2 solution (Part 1 only) implements a state machine to process the input numbers.
+
+*   **Waiting**: The circuit waits for input.
+*   **Extracting Digits**: Uses the Double Dabble algorithm to extract decimal digits.
+*   **Checking Pairs**: Checks if adjacent digits are equal.
+*   **Incrementing**: Performs a ripple add operation.
+
+**Performance**: Takes 4963923 cycles (~2.00 per number checked).
+
 ## Usage
 
 ### Setup
