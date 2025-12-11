@@ -1,6 +1,6 @@
 (executable
  (name main)
- (public_name day1part1)
+ (public_name day1)
  (modules main)
  (libraries hardcaml hardware)
  (preprocess

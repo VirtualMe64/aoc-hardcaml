@@ -16,7 +16,8 @@ module O = struct
   type 'a t =
     { ready : 'a (* whether ready to receive input *)
     ; rotation : 'a[@bits 16]
-    ; count: 'a[@bits 16]
+    ; part1_count: 'a[@bits 16]
+    ; part2_count: 'a[@bits 16]
     }
   [@@deriving hardcaml]
 end
@@ -64,7 +65,8 @@ let create (i : _ I.t) =
     let direction_reg = Always.Variable.reg ~width:1 ~enable:vdd r_sync in 
     let rotation_reg = Always.Variable.reg ~width:16 ~enable:vdd
       (Reg_spec.override ~clear_to:(of_int ~width:16 50) r_sync) in (* start at 50 *)
-    let counter_reg = Always.Variable.reg ~width:16 ~enable:vdd r_sync in
+    let part1_counter_reg = Always.Variable.reg ~width:16 ~enable:vdd r_sync in
+    let part2_counter_reg = Always.Variable.reg ~width:16 ~enable:vdd r_sync in
     Always.(
       compile [
         sm.switch [
@@ -80,12 +82,16 @@ let create (i : _ I.t) =
           let sub_rot, sub_amt, sub_overflow = sub_op rotation_reg.value amount_reg.value in
           let next_rot = mux2 direction_reg.value add_rot sub_rot in
           let next_amt = mux2 direction_reg.value add_amt sub_amt in
-          let _overflow = mux2 direction_reg.value add_overflow sub_overflow in
+          let overflow = mux2 direction_reg.value add_overflow sub_overflow in
           let gt_100 = amount_reg.value >: (of_int ~width:16 100) in
           [ rotation_reg <-- next_rot
           ; amount_reg <-- next_amt
           ; when_ ((next_rot ==: of_int ~width:16 0) &: (~: gt_100)) [
-            counter_reg <-- counter_reg.value +: of_int ~width:16 1
+            part1_counter_reg <-- part1_counter_reg.value +: of_int ~width:16 1
+          ]
+          ; when_ ((next_rot ==: of_int ~width:16 0) |: gt_100 |:
+            (overflow &: (rotation_reg.value <>: of_int ~width:16 0))) [
+            part2_counter_reg <-- part2_counter_reg.value +: of_int ~width:16 1
           ]
           ; when_ (~: gt_100) [
              sm.set_next ReadyForInput
@@ -93,14 +99,15 @@ let create (i : _ I.t) =
           ])
     ]]);
     { O.rotation = rotation_reg.value
-    ; O.count = counter_reg.value
+    ; O.part1_count = part1_counter_reg.value
+    ; O.part2_count = part2_counter_reg.value
     ; O.ready = sm.is States.ReadyForInput
     }
 ;;
 
 module Simulator = Cyclesim.With_interface(I)(O)
 
-let testbench input =
+let testbench input verbose =
   let sim = Simulator.create create in
   let inputs : _ I.t = Cyclesim.inputs sim in
   let outputs : _ O.t = Cyclesim.outputs sim in
@@ -129,7 +136,8 @@ let testbench input =
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     Cyclesim.cycle sim;
-    Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
+    if verbose then
+      Stdio.printf "rotation=%d, part1=%d, part2=%d\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   in
   List.iter (fun (dir, amount) -> step ~dir ~amount) input;
   (* allow processing of final element *)
@@ -140,7 +148,7 @@ let testbench input =
     inputs.valid := Bits.gnd;
     Cyclesim.cycle sim;
   done;
-  Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
+  Stdio.printf "rotation=%d, part1=%d, part2=%d\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
 ;;
 
 let test_input = [
@@ -158,19 +166,19 @@ let test_input = [
 
 let%expect_test "test small numbers" =
     (* Construct the simulation and get its input and output ports. *)
-    testbench test_input;
+    testbench test_input true;
     [%expect {|
-      rotation='50', count='0'
-      rotation='82', count='0'
-      rotation='52', count='0'
-      rotation='0', count='1'
-      rotation='95', count='1'
-      rotation='55', count='1'
-      rotation='0', count='2'
-      rotation='99', count='2'
-      rotation='0', count='3'
-      rotation='14', count='3'
-      rotation='32', count='3'
+      rotation=50, part1=0, part2=0
+      rotation=82, part1=0, part2=1
+      rotation=52, part1=0, part2=1
+      rotation=0, part1=1, part2=2
+      rotation=95, part1=1, part2=2
+      rotation=55, part1=1, part2=3
+      rotation=0, part1=2, part2=4
+      rotation=99, part1=2, part2=4
+      rotation=0, part1=3, part2=5
+      rotation=14, part1=3, part2=5
+      rotation=32, part1=3, part2=6
       |}]
 
 let (large_numbers) = [
@@ -179,9 +187,9 @@ let (large_numbers) = [
 ]
 
 let%expect_test "test large numbers" =
-    testbench large_numbers;
+    testbench large_numbers true;
     [%expect {|
-      rotation='50', count='0'
-      rotation='0', count='1'
-      rotation='0', count='2'
+      rotation=50, part1=0, part2=0
+      rotation=0, part1=1, part2=3
+      rotation=0, part1=2, part2=5
       |}]
