@@ -23,20 +23,44 @@ end
 module States = struct
   type t = 
     | ReadyForInput
-    | Processing
+    | ExtractingDigits1
+    | ExtractingDigits2
+    | CheckingEquality
   [@@deriving sexp_of, compare ~localize, enumerate]
 end
 
-(* idea: for each range, first extract the base 10 digits into digit_regfile *)
+let add_and_shift dcb_value =
+  let map_chunks f signal =
+    let chunks = 
+      List.init 16 (fun i ->
+        select signal (i * 4 + 3) (i * 4)  
+      ) 
+    in
+    let mapped_chunks = List.map f chunks in
+    concat_lsb mapped_chunks
+  in
+  let added_result =
+    map_chunks (fun chunk ->
+      mux2 (chunk >:. 4) (chunk +:. 3) chunk 
+    ) dcb_value
+  in
+  let shifted_result = sll added_result 1 in
+  shifted_result
+;;
+
+(* first extract the base 10 digits into digit_regfile with double dabble *)
 (* check for equality with length check + concat + xor *)
 (* increment efficiently by scanning *)
-(* states are ReadyForInput -> ExtractingDigits -> CheckingEquality -> Incrementing *)
+(* states are ReadyForInput -> ExtractingDigits (2 parts) -> CheckingEquality -> Incrementing *)
 let create (i : _ I.t) =
     let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
     let sm = Always.State_machine.create (module States) ~enable:vdd r_sync in
     let curr_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
     let upper_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
-    let _digit_regfile = List.init 16 (fun _ -> Always.Variable.reg ~width:4 ~enable:vdd r_sync) in
+    let dcb_right = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
+    let dcb_regfile = Always.Variable.reg ~width:(16 * 4) ~enable:vdd r_sync in
+    let dcb_length = Always.Variable.reg ~width:5 ~enable:vdd r_sync in
+    let dcb_timer = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
     let counter_reg = Always.Variable.reg ~width:32 ~enable:vdd r_sync in
 
     Always.(
@@ -46,17 +70,40 @@ let create (i : _ I.t) =
           [ curr_reg <-- i.lower
           ; upper_reg <-- i.upper
           ; when_ i.valid [
-            sm.set_next Processing
+            sm.set_next ExtractingDigits1
           ]
           ]);
-          (Processing, 
+          (ExtractingDigits1,
+          [ dcb_right <-- curr_reg.value
+          ; dcb_regfile <--. 0
+          ; dcb_length <--. 0
+          ; dcb_timer <--. 0
+          ; sm.set_next ExtractingDigits2
+          ]
+          );
+          (ExtractingDigits2,
+          let shift_added_dcb = add_and_shift dcb_regfile.value in
+          let new_dcb = concat_msb [ select shift_added_dcb 63 1 ; msb dcb_right.value ] in
+          [ dcb_regfile <-- new_dcb
+          ; dcb_right <-- sll dcb_right.value 1
+          ; dcb_timer <-- dcb_timer.value +:. 1
+          ; when_ (dcb_timer.value ==:. 31) [
+              dcb_length <-- srl ((of_int ~width:5 64) -: (select (leading_zeros new_dcb) 4 0) +:. 3) 2
+            ; sm.set_next CheckingEquality
+            ]
+          ]
+          );
+          (CheckingEquality, 
           [ curr_reg <-- curr_reg.value +:. 1
+          ; when_ (dcb_length.value ==:. 2) [
+            counter_reg <-- counter_reg.value +:. 1
+          ]
           ; when_ (curr_reg.value >=: upper_reg.value) [
              sm.set_next ReadyForInput
           ]
           ])
     ]]);
-    { O.count = counter_reg.value
+    { (*O.count = counter_reg.value*) O.count = select dcb_regfile.value 31 0
     ; O.ready = sm.is States.ReadyForInput
     }
 ;;
@@ -109,9 +156,9 @@ let testbench input verbose =
 
 let test_input = [
   (11, 22);
-  (* (95, 115);
+  (95, 115);
   (998, 1012);
-  (1188511880, 1188511890);
+  (* (1188511880, 1188511890);
   (222220, 222224);
   (1698522, 1698528);
   (446443, 446449);
@@ -126,15 +173,7 @@ let%expect_test "test small numbers" =
     testbench test_input true;
     [%expect {|
       count=0
-      count=12
-      count=33
-      count=48
-      count=59
-      count=64
-      count=71
-      count=78
-      count=85
-      count=92
-      count=99
-      count=106
+      count=17
+      count=149
+      count=2456
       |}]
