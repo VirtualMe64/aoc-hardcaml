@@ -5,22 +5,12 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
-
-(authors "Author Name <author@example.com>")
-
-(maintainers "Maintainer Name <maintainer@example.com>")
-
-(license LICENSE)
-
-(documentation https://url/to/documentation)
+ (github VirtualMe64/aoc-hardcaml))
 
 (package
  (name aoc-hardcaml)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml)
- (tags
-  ("add topics" "to describe" your project)))
+ (synopsis "Advent of Code solutions implemented in Hardcaml")
+ (description "My submission to the Advent of FPGA challenge -- Advent of Code implemented in Hardcaml.")
+ (depends ocaml))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/reference/dune-project/index.html
