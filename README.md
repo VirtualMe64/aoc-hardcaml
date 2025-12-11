@@ -31,7 +31,7 @@ Implementing the equality check was the most interesting part of this circuit. F
 
 **Performance**: Takes 4963923 cycles (~2.00 per number checked).
 
-## Day 3
+### Day 3
 
 This is my favorite circuit so far by a good margin. My reference python implementation iterated over each of the output digits for each input character, which would be somewhat inefficient and didn't feel in the spirit of an FPGA. Instead, I initialize a processor for each digit, and the characters are passed through them from the MSB to the LSB. This means with sufficiently long input strings we'd approach one cycle per character!
 
