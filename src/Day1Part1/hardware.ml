@@ -28,37 +28,34 @@ module States = struct
   [@@deriving sexp_of, compare ~localize, enumerate]
 end
 
-let add_op rotation amount = let max_without_overflow = (of_int ~width:8 99) -: amount in
-  mux2 (rotation >: max_without_overflow) (* if sum would be >= 100 *)
-    (rotation +: amount -: of_int ~width:8 100)
-    (rotation +: amount)
+(* returns new value (for rotation/amount) and whether there was overflow *)
+let add_op rotation amount = 
+  let gt_100 = amount >: (of_int ~width:8 100) in
+  let overflow = rotation >=: (of_int ~width:8 100 -: amount) in
+  (
+    mux2 gt_100 rotation
+      (mux2 overflow
+        (rotation +: amount -: of_int ~width:8 100) 
+        (rotation +: amount)
+      ),
+    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:8 100)) amount,
+    overflow
+  )
+;;
 
 let sub_op rotation amount =
-  mux2 (rotation <: amount) (* if subtraction would be negative *)
-    (rotation +: of_int ~width:8 100 -: amount)
-    (rotation -: amount)
-
-    (* let rotation_reg =
-      reg_fb
-        (Reg_spec.override ~clear_to:(of_int ~width:8 50)
-          (Reg_spec.create ~clock:i.clock ~clear:i.clear ()))
-        ~enable:vdd
-        ~width:8
-        ~f:(fun d -> 
-              mux2 i.dir
-                (add_op d i.amount)
-                (sub_op d i.amount)
-        ) 
-       in
-    let count_reg =
-      reg_fb
-        (Reg_spec.create ~clock:i.clock ~clear:i.clear ())
-        ~enable:vdd
-        ~width:8
-        ~f:(fun d -> mux2 (rotation_reg ==: of_int ~width:8 0)
-                      (d +: of_int ~width:8 1)
-                      d)
-       in *)
+  let gt_100 = amount >: (of_int ~width:8 100) in
+  let overflow = rotation <: amount in (* if subtracting would be negative *)
+  (
+    mux2 gt_100 rotation
+      (mux2 overflow
+        (rotation +: of_int ~width:8 100 -: amount)
+        (rotation -: amount)
+      ),
+    mux2 (gt_100 |: overflow) (amount -: (of_int ~width:8 100)) amount,
+    overflow
+  )
+;;
 
 let create (i : _ I.t) =
     let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
@@ -79,16 +76,20 @@ let create (i : _ I.t) =
           ]
           ]);
           (Processing, 
-          let next_val = 
-            mux2 direction_reg.value
-              (add_op rotation_reg.value amount_reg.value)
-              (sub_op rotation_reg.value amount_reg.value)
-          in
-          [ rotation_reg <-- next_val
-          ; when_ (next_val ==: of_int ~width:8 0) [
+          let add_rot, add_amt, add_overflow = add_op rotation_reg.value amount_reg.value in
+          let sub_rot, sub_amt, sub_overflow = sub_op rotation_reg.value amount_reg.value in
+          let next_rot = mux2 direction_reg.value add_rot sub_rot in
+          let next_amt = mux2 direction_reg.value add_amt sub_amt in
+          let _overflow = mux2 direction_reg.value add_overflow sub_overflow in
+          let gt_100 = amount_reg.value >: (of_int ~width:8 100) in
+          [ rotation_reg <-- next_rot
+          ; amount_reg <-- next_amt
+          ; when_ ((next_rot ==: of_int ~width:8 0) &: (~: gt_100)) [
             counter_reg <-- counter_reg.value +: of_int ~width:8 1
           ]
-          ; sm.set_next ReadyForInput
+          ; when_ (~: gt_100) [
+             sm.set_next ReadyForInput
+          ]
           ])
     ]]);
     { O.rotation = rotation_reg.value
@@ -181,6 +182,6 @@ let%expect_test "test large numbers" =
     testbench large_numbers;
     [%expect {|
       rotation='50', count='0'
-      rotation='44', count='0'
-      rotation='200', count='0'
+      rotation='0', count='1'
+      rotation='0', count='2'
       |}]
