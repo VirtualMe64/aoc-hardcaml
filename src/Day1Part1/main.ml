@@ -3,19 +3,6 @@ open Hardware
 
 module Simulator = Cyclesim.With_interface(I)(O)
 
-let test_input = [
-  (false, 68);
-  (false, 30);
-  (true, 48);
-  (false, 5);
-  (true, 60);
-  (false, 55);
-  (false, 1);
-  (false, 99);
-  (true, 14);
-  (false, 82);
-]
-
 let testbench input =
   let sim = Simulator.create create in
   let inputs : _ I.t = Cyclesim.inputs sim in
@@ -45,7 +32,7 @@ let testbench input =
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     Cyclesim.cycle sim;
-    Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
+    (* Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count)); *)
   in
   List.iter (fun (dir, amount) -> step ~dir ~amount) input;
   (* allow processing of final element *)
@@ -59,4 +46,19 @@ let testbench input =
   Stdio.printf "rotation='%d', count='%d'\n" (Bits.to_int !(outputs.rotation)) (Bits.to_int !(outputs.count));
 ;;
 
-let () = testbench test_input
+let parse_line line =
+  let dir_char = String.get line 0 in
+  let dir = match dir_char with
+    | 'L' -> false
+    | 'R' -> true
+    | _ -> failwith "Invalid direction character"
+  in
+  let amount_str = String.sub line 1 (String.length line - 1) in
+  let amount = int_of_string amount_str in
+  (dir, amount)
+;;
+
+Stdio.printf "Expecting output: 1021\n"
+let file = "inputs/day1.txt"
+let content = In_channel.with_open_text file In_channel.input_lines
+let () = testbench (List.map parse_line content)
