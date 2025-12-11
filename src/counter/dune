@@ -1,0 +1,14 @@
+(executable
+ (name main)
+ (public_name counter)
+ (modules main)
+ (libraries hardcaml counter_hw)
+ (preprocess
+  (pps ppx_jane ppx_hardcaml)))
+
+(library
+ (name counter_hw)
+ (modules counter)
+ (inline_tests)
+ (preprocess (pps ppx_jane ppx_hardcaml))
+ (libraries hardcaml hardcaml_waveterm))

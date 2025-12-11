@@ -1,6 +1,0 @@
-(executable
- (public_name aoc-hardcaml)
- (name main)
- (libraries hardcaml hardcaml_waveterm counter)
- (preprocess
-  (pps ppx_jane)))

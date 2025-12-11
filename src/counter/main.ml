@@ -1,0 +1,27 @@
+open Hardcaml
+open Counter_hw.Counter
+
+module Simulator = Cyclesim.With_interface(I)(O)
+
+let testbench () =
+  let sim = Simulator.create create in
+  let inputs : _ I.t = Cyclesim.inputs sim in
+  let outputs : _ O.t = Cyclesim.outputs sim in
+  (* Perform a clock cycle.  Apply the given values to [incr] and [clear].
+      Printf the current values of [dout]. *)
+  let step ~clear ~incr =
+    inputs.clear := if clear=1 then Bits.vdd else Bits.gnd;
+    inputs.incr := if incr=1 then Bits.vdd else Bits.gnd;
+    Stdio.printf "dout='%s'\n" (Bits.to_string !(outputs.dout));
+    Cyclesim.cycle sim;
+  in
+  (* Run the counter for 6 clock cycles. *)
+  step ~clear:0 ~incr:0;
+  step ~clear:0 ~incr:1;
+  step ~clear:0 ~incr:1;
+  step ~clear:1 ~incr:0;
+  step ~clear:0 ~incr:0;
+  step ~clear:0 ~incr:0;
+;;
+
+let () = testbench ()

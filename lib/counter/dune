@@ -1,5 +1,0 @@
-(library
- (name counter)
- (libraries hardcaml)
- (preprocess
-  (pps ppx_jane ppx_hardcaml)))
