@@ -29,7 +29,7 @@ I used a multiphase approach for day two. After reciving the input, I extract th
 
 Implementing the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These would all be computed in parallel in hardware, then a mux with the number of digits is used to get the result.
 
-**Performance**: Takes 4963923 cycles (~2.00 per number checked).
+**Performance**: Executes in 4963923 cycles (~2.00 per number checked).
 
 ### Day 3
 
@@ -38,6 +38,8 @@ This is my favorite circuit so far by a good margin. My reference python impleme
 ![system diagram](images/day3.png)
 
 I'm also quite happy with how this approach generalized -- part 1 and part 2 use the same exact approach, part 1 with a chain of 2 processors and part 2 with a chain of 12.
+
+**Performance**: Executes in 22800 cycles (114 per input, 1.14 per character)
 
 ## Usage
 
