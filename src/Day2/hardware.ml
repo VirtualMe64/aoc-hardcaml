@@ -15,7 +15,8 @@ end
 module O = struct
   type 'a t =
     { ready : 'a (* whether ready to receive input *)
-    ; count : 'a[@bits 64]
+    ; part1_count : 'a[@bits 64]
+    ; part2_count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -51,7 +52,41 @@ let add_and_shift dcb_value =
 
 let dcb_length s = srl ((of_int ~width:7 64) -: (select (leading_zeros s) 6 0) +:. 3) 2
 
+let unique_factors i =
+  let rec aux x n =
+    if x == 0 then []
+    else if x == 1 then [1]
+    else if n mod x == 0 then x :: aux (x - 1) n
+    else aux (x - 1) n
+  in
+  aux (i - 1) i
+;;
+
+let test_length s len =
+  let factors = unique_factors len in
+  List.map (fun factor ->
+    let target_chunk = select s (factor * 4 - 1) 0 in (* all must match first chunk *)
+    let num_chunks = len / factor in
+    let chunks = 
+      List.init num_chunks (fun i ->
+        select s (i * factor * 4 + (factor * 4 - 1)) (i * factor * 4)
+      )
+    in
+    List.fold_left (fun acc chunk ->
+      acc &: (chunk ==: target_chunk)
+    ) vdd chunks
+  ) factors
+  |> List.fold_left (fun acc factor -> acc |: factor) gnd
+;;
+
 let equality_by_length s = 
+  List.init 16 (fun i ->
+    let len = i + 1 in
+    test_length s len
+  )
+;;
+
+let part1_equality_by_length s = 
   List.init 8 (fun len ->
     let first_half = select s (len * 4 + 3) 0 in
     let second_half = select s (len * 8 + 7) (len * 4 + 4) in
@@ -86,7 +121,8 @@ let create (i : _ I.t) =
     let dcb_right = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
     let dcb_regfile = Always.Variable.reg ~width:(16 * 4) ~enable:vdd r_sync in
     let dcb_timer = Always.Variable.reg ~width:8 ~enable:vdd r_sync in
-    let counter_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+    let part1_counter_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+    let part2_counter_reg = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
 
     Always.(
       compile [
@@ -117,12 +153,17 @@ let create (i : _ I.t) =
           ]
           );
           (CheckingEquality,
-          let is_even_length = (lsb (dcb_length dcb_regfile.value)) ==:. 0 in
-          let half_length = srl (dcb_length dcb_regfile.value) 1 in
           let by_length = equality_by_length dcb_regfile.value in
-          [ when_ is_even_length [
-            when_ (mux (half_length -:. 1) by_length) [
-              counter_reg <-- counter_reg.value +: curr_reg.value;
+          let part1_by_length = part1_equality_by_length dcb_regfile.value in
+          let length = dcb_length dcb_regfile.value in
+          let half_length = srl length 1 in
+          let is_even_length = (lsb length) ==:. 0 in
+          [ when_ (mux (length -:. 1) by_length) [
+            part2_counter_reg <-- part2_counter_reg.value +: curr_reg.value;
+          ]
+          ; when_ is_even_length [
+            when_ (mux (half_length -:. 1) part1_by_length) [
+              part1_counter_reg <-- part1_counter_reg.value +: curr_reg.value;
             ]
           ]
           ; if_ (curr_reg.value >=: upper_reg.value) [
@@ -139,7 +180,8 @@ let create (i : _ I.t) =
           ]
           )
     ]]);
-    { O.count = counter_reg.value
+    { O.part1_count = part1_counter_reg.value
+    ; O.part2_count = part2_counter_reg.value
     ; O.ready = sm.is States.ReadyForInput
     }
 ;;
@@ -179,7 +221,7 @@ let testbench input verbose =
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
     if verbose then
-      Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count));
+      Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   in
   List.iter (fun (lower, upper) -> step ~lower ~upper) input;
   (* allow processing of final element *)
@@ -191,7 +233,7 @@ let testbench input verbose =
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
   done;
-  Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count));
+  Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
@@ -229,20 +271,28 @@ let%expect_test "test small numbers" =
       |}]
 
 let%expect_test "equality_by_length test" =
-  let s = of_int ~width:64 0b0000_0000_0000_0000_0000_0000_0000_0000_0000_1111_1111_1111_0000_1111_1111_1111 in
+  let s = of_int ~width:64 0b0000_0000_0000_0000_0000_0001_0001_0001_0000_0001_0001_0001_0000_0001_0001_0001 in
   let results = equality_by_length s in
   List.iteri (fun i res ->
     Stdio.printf "Length %d equality: %b\n" (i + 1) (Signal.to_bool res)
   ) results;
   [%expect {|
-    Length 1 equality: true
-    Length 2 equality: false
-    Length 3 equality: false
-    Length 4 equality: true
+    Length 1 equality: false
+    Length 2 equality: true
+    Length 3 equality: true
+    Length 4 equality: false
     Length 5 equality: false
     Length 6 equality: false
     Length 7 equality: false
-    Length 8 equality: false
+    Length 8 equality: true
+    Length 9 equality: false
+    Length 10 equality: false
+    Length 11 equality: false 
+    Length 12 equality: true
+    Length 13 equality: false
+    Length 14 equality: false
+    Length 15 equality: false
+    Length 16 equality: false
     |}]
 
 let%expect_test "dcb_ripple_increment test" = 

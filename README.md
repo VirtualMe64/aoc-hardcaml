@@ -26,16 +26,20 @@ My Day 1 solution implements a state machine with two states: `ReadyForInput` an
     *   **Large Numbers**: To handle amounts larger than 100, the circuit subtracts 100 from the amount in each cycle until it is within range.
     *   **Counters**: I maintain counters for Part 1 and Part 2, incrementing them based on the rotation and overflow conditions.
 
+I originally tried to solve this without a state machine, but without a mod operation I couldn't think of another way to handle numbers greater than 100, and switched to an approach where I can use multiple cycles per input (via ready and valid signals).
+
 **Performance**: Executes in 12208 cycles (~2.93 per input line).
 
 ### Day 2
 
-My Day 2 solution (Part 1 only) implements a state machine to process the input numbers.
+My Day 2 solution uses a state machine to process the input numbers:
 
 *   **Waiting**: The circuit waits for input.
 *   **Extracting Digits**: Uses the Double Dabble algorithm to extract decimal digits.
-*   **Checking Pairs**: Checks if adjacent digits are equal.
+*   **Checking Equality**: Checks each possible chunk size to see if the digits are repeating.
 *   **Incrementing**: Performs a ripple add operation.
+
+Implement the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These would all be computed in parallel in hardware, then a mux with the number of digits is used to get the result.
 
 **Performance**: Takes 4963923 cycles (~2.00 per number checked).
 

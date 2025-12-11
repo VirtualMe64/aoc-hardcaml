@@ -11,7 +11,7 @@ let parse_line line = (* 1-5,8-10 -> [(1, 5); (8, 10)] *)
   ) (String.split_on_char ',' line)
 ;;
 
-Stdio.printf "Expecting: part1=19605500130, part2=36862281418\n"
+Stdio.printf "part1_ideal=19605500130, part2_ideal=36862281418\n"
 let file = "inputs/day2.txt"
 
 let content = In_channel.with_open_text file In_channel.input_line
