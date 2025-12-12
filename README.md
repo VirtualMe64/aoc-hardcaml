@@ -19,11 +19,15 @@ The project is structured with each day's circuit in its own folder within `src/
 
 ### Day 1
 
+[Problem](https://adventofcode.com/2025/day/1) | [Solution](src/Day1/hardware.ml)
+
 This was my first time making any non-trivial Hardcaml circuit, so I spent a lot of time getting the basics of file format, structure, and testing working. My initial approach only handled numbers in the range [0, 200], and took a single cycle for each input. To make it work with larger inputs, I switched to a state machine and repeated subtracted 100 until it's in this range. Short of implementing modular arithmetic, I'm happy with this solution.
 
 **Performance**: Executes in 12208 cycles (~2.93 per input line).
 
 ### Day 2
+
+[Problem](https://adventofcode.com/2025/day/2) | [Solution](src/Day2/hardware.ml)
 
 I used a multiphase approach for day two. After reciving the input, I extract the decimal digits using the Double Dabble algorithm, check for equality among all relevant sets of chunks, and then increment with a ripple add operation.
 
@@ -32,6 +36,8 @@ Implementing the equality check was the most interesting part of this circuit. F
 **Performance**: Executes in 4963923 cycles (~2.00 per number checked).
 
 ### Day 3
+
+[Problem](https://adventofcode.com/2025/day/3) | [Solution](src/Day3/hardware.ml)
 
 This is my favorite circuit so far by a good margin. My reference python implementation iterated over each of the output digits for each input character, which would be somewhat inefficient and didn't feel in the spirit of an FPGA. Instead, I initialize a processor for each digit, and the characters are passed through them from the MSB to the LSB. This means with sufficiently long input strings we'd approach one cycle per character!
 
