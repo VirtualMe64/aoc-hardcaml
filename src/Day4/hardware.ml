@@ -133,7 +133,7 @@ module Simulator = Cyclesim.With_interface(I)(O)
 
 let testbench input _verbose =
   let cycle_count = ref 0 in
-  let sim = Simulator.create (create 10) in
+  let sim = Simulator.create (create (String.length (List.hd input))) in
   let inputs : _ I.t = Cyclesim.inputs sim in
   let outputs : _ O.t = Cyclesim.outputs sim in
 

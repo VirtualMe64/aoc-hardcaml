@@ -1,10 +1,10 @@
-; (executable
-;  (name main)
-;  (public_name day4)
-;  (modules main)
-;  (libraries hardcaml hardware_day3)
-;  (preprocess
-;   (pps ppx_jane ppx_hardcaml)))
+(executable
+ (name main)
+ (public_name day4)
+ (modules main)
+ (libraries hardcaml hardware_day4)
+ (preprocess
+  (pps ppx_jane ppx_hardcaml)))
 
 (library
  (name hardware_day4)
