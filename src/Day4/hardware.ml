@@ -197,17 +197,16 @@ let%expect_test "test circuit" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      debug1: 2, debug2: 1, count=0
-      debug1: 19, debug2: 19, count=4
-      debug1: 21, debug2: 21, count=6
-      debug1: 20, debug2: 5, count=7
-      debug1: 20, debug2: 19, count=7
-      debug1: 20, debug2: 19, count=8
-      debug1: 7, debug2: 18, count=9
-      debug1: 23, debug2: 3, count=9
-      debug1: 23, debug2: 19, count=10
-      debug1: 21, debug2: 4, count=10
-      debug1: 18, debug2: 2, count=12
-      debug1: 1, debug2: 0, count=13
-      Total cycles: 121
+      part1_count=0
+      part1_count=4
+      part1_count=6
+      part1_count=7
+      part1_count=7
+      part1_count=8
+      part1_count=9
+      part1_count=9
+      part1_count=10
+      part1_count=10
+      part1_count=13
+      Total cycles: 113
       |}]

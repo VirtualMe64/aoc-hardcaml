@@ -255,19 +255,19 @@ let%expect_test "test small numbers" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      count=0
-      count=33
-      count=132
-      count=1142
-      count=1188513027
-      count=1188735249
-      count=1188735249
-      count=1189181695
-      count=1227775554
-      count=1227775554
-      count=1227775554
-      count=1227775554
-      Total cycles: 575
+      part1_count=0, part2_count=0
+      part1_count=33, part2_count=33
+      part1_count=132, part2_count=243
+      part1_count=1142, part2_count=2252
+      part1_count=1188513027, part2_count=1188514137
+      part1_count=1188735249, part2_count=1188736359
+      part1_count=1188735249, part2_count=1188736359
+      part1_count=1189181695, part2_count=1189182805
+      part1_count=1227775554, part2_count=1227776664
+      part1_count=1227775554, part2_count=1228342320
+      part1_count=1227775554, part2_count=2053167144
+      part1_count=1227775554, part2_count=4174379265
+      Total cycles: 927
       |}]
 
 let%expect_test "equality_by_length test" =

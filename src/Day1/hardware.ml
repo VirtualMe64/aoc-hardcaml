@@ -184,6 +184,7 @@ let%expect_test "test small numbers" =
       rotation=0, part1=3, part2=5
       rotation=14, part1=3, part2=5
       rotation=32, part1=3, part2=6
+      Total cycles: 20
       |}]
 
 let (large_numbers) = [
@@ -197,4 +198,5 @@ let%expect_test "test large numbers" =
       rotation=50, part1=0, part2=0
       rotation=0, part1=1, part2=3
       rotation=0, part1=2, part2=5
+      Total cycles: 7
       |}]
