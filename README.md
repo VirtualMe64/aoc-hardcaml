@@ -72,7 +72,7 @@ The circuit came together relatively quickly, but there were several hours of de
 
 My solution uses an array of processing elements  with width equal to the width of the input. Each processing element passes state with it's neighbor, and the circuit processes an entire row of input at a time. This makes the whole circuit both quite elegant to write in Hardcaml and very low latency -- achieving a one cycle per row of input. This may beat day 3 for my favorite solution so far!
 
-[System diagram](images/day7.png)
+![System diagram](images/day7.png)
 
 Each processing element represents a column, and stores the number of paths reaching the column and the number of splits which occured at the column The update logic is pretty simple:
 - Add input from neighbors to number of paths
