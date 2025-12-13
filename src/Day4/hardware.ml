@@ -127,18 +127,16 @@ let testbench input _verbose =
 
 
   let stream ~line =
-    String.iteri (fun i c ->
+    String.iter (fun c ->
       let value = if c = '1' then Bits.vdd else Bits.gnd in
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.vdd;
       inputs.input := value;
       cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
-      if _verbose then
-        Stdio.printf "%d, debug1: %d, debug2: %d, count=%d\n" i (Bits.to_int !(outputs.debug1)) (Bits.to_int !(outputs.debug2)) (Bits.to_int !(outputs.count))
     ) line;
-    (* if _verbose then
-      Stdio.printf "count=%d\n" (Bits.to_int !(outputs.count)) *)
+    if _verbose then
+      Stdio.printf "debug1: %d, debug2: %d, count=%d\n" (Bits.to_int !(outputs.debug1)) (Bits.to_int !(outputs.debug2)) (Bits.to_int !(outputs.count))
   in
   List.iter (fun line -> stream ~line:line) input;
       while (not (Bits.to_bool !(outputs.ready))) do
@@ -176,10 +174,17 @@ let%expect_test "test circuit" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      part1_count=98, part2_count=987654321111
-      part1_count=187, part2_count=1798765432230
-      part1_count=265, part2_count=2232999666508
-      part1_count=357, part2_count=3121910778619
-      part1_count=357, part2_count=3121910778619
-      Total cycles: 116
+      debug1: 2, debug2: 1, count=0
+      debug1: 19, debug2: 19, count=4
+      debug1: 21, debug2: 21, count=6
+      debug1: 20, debug2: 5, count=7
+      debug1: 20, debug2: 19, count=7
+      debug1: 20, debug2: 19, count=8
+      debug1: 7, debug2: 18, count=9
+      debug1: 23, debug2: 3, count=9
+      debug1: 23, debug2: 19, count=10
+      debug1: 21, debug2: 4, count=10
+      debug1: 18, debug2: 2, count=12
+      debug1: 1, debug2: 0, count=13
+      Total cycles: 121
       |}]
