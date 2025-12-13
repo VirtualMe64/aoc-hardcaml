@@ -62,9 +62,28 @@ Since the first part only has dependencies of length `w` for a `w x h` grid, I w
 ![System diagram](images/day4.png)
 
 
-The circuit came together relatively quickly, but there were several hours of debugging hell to deal with off by one errors, register/ram timing issues, flushing, and handling boundary cases. I'm very happy with the result though, and I doubt it could be significantly improved for a 1-character-at-a-time streaming input.
+The circuit came together relatively quickly, but there were several hours of debugging to deal with off by one errors, register/ram timing issues, flushing, and handling boundary cases. I'm very happy with the result though, and I doubt it could be significantly improved for a 1-character-at-a-time streaming input.
 
-**Performance** Executes in 19185 cycles (~1.007 character)
+**Performance** Executes in 19185 cycles (~1.007 per character)
+
+### Day 7
+
+[Problem](https://adventofcode.com/2025/day/7) | [Solution](src/Day4/hardware.ml)
+
+My solution uses an array of processing elements  with width equal to the width of the input. Each processing element passes state with it's neighbor, and the circuit processes an entire row of input at a time. This makes the whole circuit both quite elegant to write in Hardcaml and very low latency -- achieving a one cycle per row of input. This may beat day 3 for my favorite solution so far!
+
+[System diagram](images/day7.png)
+
+Each processing element represents a column, and stores the number of paths reaching the column and the number of splits which occured at the column The update logic is pretty simple:
+- Add input from neighbors to number of paths
+- If the input is a `^`:
+    - Output number of paths to neighbors
+    - If number of paths is > 0, increment number of splits
+- If the input is an `S`, increment number of paths
+
+Then the part 1 output is the sum of splits across each processing element, and the part 2 output is the sum of path counts
+
+**Performance**: Executes in 142 cycles (1 per line)
 
 ## Usage
 
