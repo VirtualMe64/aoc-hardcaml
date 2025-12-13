@@ -21,9 +21,11 @@ The project is structured with each day's circuit in its own folder within `src/
 
 [Problem](https://adventofcode.com/2025/day/1) | [Solution](src/Day1/hardware.ml)
 
-This was my first time making any non-trivial Hardcaml circuit, so I spent a lot of time getting the basics of file format, structure, and testing working. My initial approach only handled numbers in the range [0, 200], and took a single cycle for each input. To make it work with larger inputs, I switched to a state machine and repeated subtracted 100 until it's in this range. Short of implementing modular arithmetic, I'm happy with this solution.
+This was my first time making any non-trivial Hardcaml circuit, so I spent a lot of time getting the basics of file format, structure, and testing working. My initial approach only handled numbers in the range [0, 200], and took a single cycle for each input. To make it work with larger inputs, I switched to a state machine and repeatedly subtract 100 until the rotation is in the range [0, 100]. Short of implementing modular arithmetic, I'm happy with this solution.
 
-**Performance**: Executes in 12208 cycles (~2.93 per line).
+![System diagram](images/day1.png)
+
+**Performance**: Executes in 12208 cycles (~2.934 per line).
 
 ### Day 2
 
@@ -31,9 +33,11 @@ This was my first time making any non-trivial Hardcaml circuit, so I spent a lot
 
 I used a multiphase approach for day two. After reciving the input, I extract the decimal digits using the Double Dabble algorithm, check for equality among all relevant sets of chunks, and then increment with a ripple add operation.
 
-Implementing the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These would all be computed in parallel in hardware, then a mux with the number of digits is used to get the result.
+Implementing the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These are all computed in parallel, then a mux with the number of digits is used to get the result.
 
-**Performance**: Executes in 4963923 cycles (~2.00 per number checked).
+To solve part 1, I use the same logic but explicitly checking for a chunk size of `length // 2`
+
+**Performance**: Executes in 4963923 cycles (~2.000 per number checked).
 
 ### Day 3
 
@@ -55,7 +59,10 @@ Day 4 was the first problem where I only decided to solve one of the parts. I ma
 
 Since the first part only has dependencies of length `w` for a `w x h` grid, I was able to create a circuit which only uses `O(w)` memory and about `w * h` cycles. The input to the circuit is a left to right, top to bottom stream of characters straight from the file. The core idea is to allocate a size `w` ram which stores the state of the previous `w` cells, specifically 1 bit for if it's occupied and 4 bits for the known number of neighbors. Each new cell we read both updates it's earlier neighbors and reads from them to determine it's initial number of neighbors.
 
-The circuit came together pretty quickly, but there were several hours of debugging hell to deal with off by one errors, register/ram timing issues, flushing, and handling boundary cases. I'm very happy with the result though, and I doubt it could be significantly improved for a 1-character-at-a-time streaming input.
+![System diagram](images/day4.png)
+
+
+The circuit came together relatively quickly, but there were several hours of debugging hell to deal with off by one errors, register/ram timing issues, flushing, and handling boundary cases. I'm very happy with the result though, and I doubt it could be significantly improved for a 1-character-at-a-time streaming input.
 
 **Performance** Executes in 19185 cycles (~1.007 character)
 
