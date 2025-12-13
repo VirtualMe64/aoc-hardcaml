@@ -18,8 +18,8 @@ module Make (C : Config) = struct
 
   module O = struct
     type 'a t =
-      { part1_count : 'a[@bits 32]
-      ; part2_count : 'a[@bits 32]
+      { part1_count : 'a[@bits 64]
+      ; part2_count : 'a[@bits 64]
       }
     [@@deriving hardcaml]
   end
@@ -35,39 +35,39 @@ module Make (C : Config) = struct
         ; input: 'a[@bits 2]
         ; valid: 'a
         (* data passing signals *)
-        ; left_input: 'a[@bits 32]
-        ; right_input: 'a[@bits 32]
+        ; left_input: 'a[@bits 64]
+        ; right_input: 'a[@bits 64]
         }
       [@@deriving hardcaml]
     end
 
     module O = struct
       type 'a t =
-        { neighbor_output: 'a[@bits 32]
-        ; output: 'a[@bits 32]
-        ; split_count : 'a[@bits 32]
+        { neighbor_output: 'a[@bits 64]
+        ; output: 'a[@bits 64]
+        ; split_count : 'a[@bits 64]
         }
       [@@deriving hardcaml]
     end
 
     let create (i : _ I.t) =
       let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
-      let value_reg = reg_fb r_sync ~enable:vdd ~width:32
+      let value_reg = reg_fb r_sync ~enable:vdd ~width:64
         ~f:(fun d ->
           mux2 i.valid (
             mux i.input [
               d;
-              of_int ~width:32 0;
+              of_int ~width:64 0;
               d +:. 1;
-              of_int ~width:32 0
+              of_int ~width:64 0
             ] +: i.left_input +: i.right_input
           ) d
         ) in
-      let split_reg = reg_fb r_sync ~enable:vdd ~width:32
+      let split_reg = reg_fb r_sync ~enable:vdd ~width:64
         ~f:(fun d ->
           mux2 (i.valid &: (i.input ==:. 1) &: (value_reg >:. 0)) (d +:. 1) d
         ) in
-      { O.neighbor_output = mux2 (i.input ==:. 1) value_reg (of_int ~width:32 0)
+      { O.neighbor_output = mux2 (i.input ==:. 1) value_reg (of_int ~width:64 0)
       ; O.output = value_reg
       ; O.split_count = split_reg
       }
@@ -76,7 +76,7 @@ module Make (C : Config) = struct
   
   let create (i : _ I.t) =
     let input_wires = Array.init C.bits (fun _ ->
-      wire 32;
+      wire 64;
     ) in
     let processor_file = List.fold_left (fun acc idx ->
       let proc_i = Processor.create {
@@ -84,8 +84,8 @@ module Make (C : Config) = struct
         Processor.I.clear = i.clear;
         Processor.I.valid = i.valid;
         Processor.I.input = select i.input (2 * idx + 1) (2 * idx);
-        Processor.I.left_input = if idx > 0 then (List.hd acc).Processor.O.neighbor_output else of_int ~width:32 0;
-        Processor.I.right_input = if idx < C.bits - 1 then input_wires.(idx + 1) else of_int ~width:32 0;
+        Processor.I.left_input = if idx > 0 then (List.hd acc).Processor.O.neighbor_output else of_int ~width:64 0;
+        Processor.I.right_input = if idx < C.bits - 1 then input_wires.(idx + 1) else of_int ~width:64 0;
       } 
       in
         let _ = assign input_wires.(idx) proc_i.Processor.O.neighbor_output
@@ -96,19 +96,20 @@ module Make (C : Config) = struct
     {
       O.part1_count = List.fold_left (fun acc proc ->
         acc +: proc.Processor.O.split_count
-      ) (of_int ~width:32 0) processor_file;
+      ) (of_int ~width:64 0) processor_file;
       O.part2_count = List.fold_left (fun acc proc ->
         acc +: proc.Processor.O.output
-      ) (of_int ~width:32 0) processor_file;
+      ) (of_int ~width:64 0) processor_file;
     }
   ;;
 end
 
-module Hw = Make(struct let bits = 15 end)
-module Simulator = Cyclesim.With_interface(Hw.I)(Hw.O)
-
 let testbench input verbose =
   let cycle_count = ref 0 in
+  let length = (List.hd input |> String.length) in
+  let module Hw = Make(struct let bits = length end) in
+  let module Simulator = Cyclesim.With_interface(Hw.I)(Hw.O) in 
+
   let sim = Simulator.create Hw.create in
   let inputs : _ Hw.I.t = Cyclesim.inputs sim in
   let outputs : _ Hw.O.t = Cyclesim.outputs sim in
@@ -118,16 +119,13 @@ let testbench input verbose =
       (* map symbols to numbers *)
       (List.init (String.length line) (String.get line)) |>
         List.map (function
-          | '.' -> 0
-          | '^' -> 1
-          | 'S' -> 2
+          | '.' -> Bits.of_int ~width:2 0
+          | '^' -> Bits.of_int ~width:2 1
+          | 'S' -> Bits.of_int ~width:2 2
           |  _  -> failwith "invalid input"
-      ) |>
-      List.fold_left (fun acc line ->
-        (acc lsl 2) lor line
-      ) 0
+      ) |> Bits.concat_msb
     in
-    inputs.input := Bits.of_int ~width:(2 * 15) parsed_input;
+    inputs.input := parsed_input;
     inputs.clear := Bits.gnd;
     inputs.valid := Bits.vdd;
     cycle_count := !cycle_count + 1;
