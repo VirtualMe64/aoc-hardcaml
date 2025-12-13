@@ -5,18 +5,17 @@ module I = struct
   type 'a t =
     { clock : 'a
     ; clear : 'a
-    ; input : 'a
+    ; input : 'a[@bits 8]
     ; valid : 'a
+    ; finished : 'a
     }
   [@@deriving hardcaml]
 end
 
 module O = struct
   type 'a t =
-    { ready : 'a (* whether output is valid/ready to receive input *)
-    ; debug1 : 'a[@bits 64]
-    ; debug2 : 'a[@bits 64]
-    ; count : 'a[@bits 64]
+    { ready : 'a (* whether output is ready *)
+    ; count : 'a[@bits 32]
     }
   [@@deriving hardcaml]
 end
@@ -25,6 +24,7 @@ module States = struct
   type t = 
     | Idle
     | Streaming
+    | Flushing
   [@@deriving sexp_of, compare ~localize, enumerate]
 end
 
@@ -50,19 +50,23 @@ let create n (i : _ I.t) =
         ()
     in
     let ram_rdata = ram_out.(0) in
+    let timer = Always.Variable.reg ~width:(address_width + 2) r_sync in
     let curr_addr = Always.Variable.reg ~width:address_width r_sync in
     let prev_buffer1 = Always.Variable.reg ~width:5 r_sync in
     let prev_buffer2 = Always.Variable.reg ~width:5 r_sync in
     let prev_buffer3 = Always.Variable.reg ~width:5 r_sync in
     let left_buffer = Always.Variable.reg ~width:5 r_sync in
-    let count = Always.Variable.reg ~width:64 r_sync in
+    let count = Always.Variable.reg ~width:32 r_sync in
+
+    let occupied = (i.valid) &: (i.input ==:. (Char.code '@')) in
 
     let sm = Always.State_machine.create (module States) ~enable:vdd r_sync in
     
     (* extract streaming logic so it can be applied on first cycle *)
     let streaming_logic =
+      (* construct value for curr idx (first bit for occupied, rest for neighbors) *)
       let new_left_buffer = concat_msb
-        [ i.input;
+        [ occupied;
           (mux2 (curr_addr.value ==:. n - 1) 
             (of_int ~width:4 0)
             (uresize (msb ram_rdata) 4)) +:
@@ -72,20 +76,25 @@ let create n (i : _ I.t) =
             ((uresize (msb prev_buffer2.value) 4) +:
             (uresize (msb left_buffer.value) 4)))
         ] in
-      let new_buffer1 = mux2 (i.input &: (curr_addr.value >:. 0)) (prev_buffer2.value +: (of_int ~width:5 1)) prev_buffer2.value in
-      let new_buffer2 = mux2 i.input (prev_buffer3.value +: (of_int ~width:5 1)) prev_buffer3.value in
-      let new_buffer3 = mux2 (i.input &: (curr_addr.value <:. (n - 1))) (ram_rdata +: (of_int ~width:5 1)) ram_rdata in
-      let writeback = mux2 (i.input &: (curr_addr.value >:. 0))
+
+      (* if this is occupied, add 1 to previous neighbors *)
+      let new_buffer1 = mux2 (occupied &: (curr_addr.value >:. 0)) (prev_buffer2.value +: (of_int ~width:5 1)) prev_buffer2.value in
+      let new_buffer2 = mux2 occupied (prev_buffer3.value +: (of_int ~width:5 1)) prev_buffer3.value in
+      let new_buffer3 = mux2 (occupied &: (curr_addr.value <:. (n - 1))) (ram_rdata +: (of_int ~width:5 1)) ram_rdata in
+      let writeback = mux2 (occupied &: (curr_addr.value >:. 0))
         (left_buffer.value +: (of_int ~width:5 1)) left_buffer.value in
+
       Always.[
         curr_addr <-- mux2 (curr_addr.value ==:. n - 1) (of_int ~width:address_width 0) (curr_addr.value +:. 1)
       ; when_ ((select prev_buffer1.value 3 0 <:. 4) &: (msb prev_buffer1.value ==:. 1)) [
           count <-- count.value +:. 1
         ]
+
       ; left_buffer <-- new_left_buffer
       ; prev_buffer1 <-- new_buffer1
       ; prev_buffer2 <-- new_buffer2
       ; prev_buffer3 <-- new_buffer3
+
       ; ram_we <-- vdd
       ; ram_waddr <-- mux2 (curr_addr.value ==:. 0) (of_int ~width:address_width (n - 1)) (curr_addr.value -:. 1)
       ; ram_wdata <-- writeback
@@ -100,13 +109,22 @@ let create n (i : _ I.t) =
               [sm.set_next Streaming] @ streaming_logic
             )
           ]);
-          (Streaming, streaming_logic)
+          (Streaming, [
+            when_ i.finished [
+              timer <-- of_int ~width:(address_width + 2) 0
+            ; sm.set_next Flushing
+            ]
+          ] @ streaming_logic);
+          (Flushing,
+          [ timer <-- timer.value +:. 1
+          ; when_ (timer.value ==: of_int ~width:(address_width + 2) (n) ) [
+              sm.set_next Idle
+          ]
+          ] @ streaming_logic)
         ]
       ]
     );
-    { O.ready = vdd
-    ; O.debug1 = uresize prev_buffer1.value 64
-    ; O.debug2 = uresize ram_rdata 64
+    { O.ready = sm.is Idle
     ; O.count = count.value
     }
 ;;
@@ -121,53 +139,58 @@ let testbench input _verbose =
 
   inputs.clear := Bits.vdd;
   inputs.valid := Bits.gnd;
-  inputs.input := Bits.gnd;
+  inputs.input := Bits.of_int ~width:8 0;
   cycle_count := !cycle_count + 1;
+  inputs.finished := Bits.gnd;
   Cyclesim.cycle sim;
-
 
   let stream ~line =
     String.iter (fun c ->
-      let value = if c = '1' then Bits.vdd else Bits.gnd in
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.vdd;
-      inputs.input := value;
+      inputs.input := Bits.of_int ~width:8 (Char.code c);
+      inputs.finished := Bits.gnd;
       cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
     ) line;
     if _verbose then
-      Stdio.printf "debug1: %d, debug2: %d, count=%d\n" (Bits.to_int !(outputs.debug1)) (Bits.to_int !(outputs.debug2)) (Bits.to_int !(outputs.count))
+      Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count))
   in
   List.iter (fun line -> stream ~line:line) input;
-      while (not (Bits.to_bool !(outputs.ready))) do
-      inputs.input := Bits.gnd;
+  (* indicate end of input *)
+  inputs.clear := Bits.gnd;
+  inputs.valid := Bits.gnd;
+  inputs.input := Bits.of_int ~width:8 0;
+  inputs.finished := Bits.vdd;
+  cycle_count := !cycle_count + 1;
+  Cyclesim.cycle sim;
+  while (not (Bits.to_bool !(outputs.ready))) do
       inputs.clear := Bits.gnd;
       inputs.valid := Bits.gnd;
+      inputs.input := Bits.of_int ~width:8 0;
+      inputs.finished := Bits.gnd;
       cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
     done;
+  Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
 let test_input = [
-  "0011011110";
-  "1110101011";
-  "1111101011";
-  "1011110010";
-  "1101111011";
-  "0111111101";
-  "0101010111";
-  "1011101111";
-  "0111111110";
-  "1010111010";
-  "0000000000";
-  "0000000000";
+  "..@@.@@@@.";
+  "@@@.@.@.@@";
+  "@@@@@.@.@@";
+  "@.@@@@..@.";
+  "@@.@@@@.@@";
+  ".@@@@@@@.@";
+  ".@.@.@.@@@";
+  "@.@@@.@@@@";
+  ".@@@@@@@@.";
+  "@.@.@@@.@.";
 ]
 
 (* let test_input = [
-  "1111111111";
-  "0000000000";
-  "0000000000";
+  "0000000001";
 ] *)
 
 let%expect_test "test circuit" =
