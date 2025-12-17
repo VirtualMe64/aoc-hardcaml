@@ -1,0 +1,14 @@
+(executable
+ (name main)
+ (public_name day5)
+ (modules main)
+ (libraries hardcaml hardware_day5)
+ (preprocess
+  (pps ppx_jane ppx_hardcaml)))
+
+(library
+ (name hardware_day5)
+ (modules hardware)
+ (inline_tests)
+ (preprocess (pps ppx_jane ppx_hardcaml))
+ (libraries hardcaml hardcaml_waveterm))
