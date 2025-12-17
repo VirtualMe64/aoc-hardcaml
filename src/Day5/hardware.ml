@@ -68,25 +68,31 @@ module Make (C : Config) = struct
       let valid_next = wire 1 in 
       let valid_reg = reg r_sync valid_next ~enable:(i.valid &: (i.phase ==:. 0)) in
       let evicting = i.valid &: (i.phase ==:. 0) &: ((~: valid_reg) |: (i.lower <=: lower_reg)) in
-      let contained = i.valid &: (i.phase ==:. 1) &: (i.number >=: lower_reg) &: (i.number <=: upper_reg) in
+      
+      (* Register the input valid and phase for pipelining *)
+      let valid_pipe = reg r_sync i.valid in
+      let phase_pipe = reg r_sync i.phase in
+      let number_pipe = reg r_sync i.number in
+      
+      let contained = valid_pipe &: (phase_pipe ==:. 1) &: valid_reg &: (number_pipe >=: lower_reg) &: (number_pipe <=: upper_reg) in
     
       valid_next <== (evicting |: valid_reg);
       lower_next <== mux2 (evicting) (i.lower) (lower_reg);
       upper_next <== mux2 (evicting) (i.upper) (upper_reg);
 
       (* if contained and valid, increment counter *)
-      let _counter_reg = reg_fb r_sync ~enable:(i.valid &: contained) ~width:32
+      let counter_reg = reg_fb r_sync ~enable:contained ~width:32
         ~f:(fun count -> count +:. 1) in
 
-      { O.phase = reg r_sync i.phase (* pass through phase *)
-      ; O.valid = (i.phase ==:. 1 &: i.valid &: ~: contained) |:
+      { O.phase = phase_pipe (* pass through phase *)
+      ; O.valid = (phase_pipe ==:. 1 &: valid_pipe &: ~: contained) |:
                   (i.phase ==:. 0 &: i.valid &: valid_reg)
-      ; O.number = reg r_sync i.number (* pass through number *)
+      ; O.number = number_pipe (* pass through number *)
       ; O.lower = mux2 (evicting) (smax lower_reg (i.upper +:. 1)) (smax i.lower (upper_reg +:. 1))
       ; O.upper = mux2 (evicting) upper_reg i.upper
       ; O.width = mux2 (valid_reg &: (upper_reg >=: lower_reg)) (upper_reg -: lower_reg +:. 1) (of_int ~width:32 0)
       (* ; O.width = lower_reg *)
-      ; O.count = mux2 (valid_reg) (of_int ~width:32 1) (of_int ~width:32 0)
+      ; O.count = counter_reg
       }
     ;;
   end
@@ -115,7 +121,7 @@ module Make (C : Config) = struct
   ;;
 end
 
-let testbench input verbose =
+let testbench ranges ids verbose =
   let cycle_count = ref 0 in
   let module Hw = Make(struct let max_ranges = 200 end) in
   let module Simulator = Cyclesim.With_interface(Hw.I)(Hw.O) in 
@@ -124,7 +130,7 @@ let testbench input verbose =
   let inputs : _ Hw.I.t = Cyclesim.inputs sim in
   let outputs : _ Hw.O.t = Cyclesim.outputs sim in
 
-  let step ~range =
+  let step_range ~range =
     inputs.clear := Bits.gnd;
     inputs.phase := Bits.gnd;
     inputs.valid := Bits.vdd;
@@ -136,8 +142,22 @@ let testbench input verbose =
     if verbose then
       Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   in
-  List.iter (fun range -> step ~range:range) input;
-  for _ = 1 to 5 do
+  let step_id ~id =
+    inputs.clear := Bits.gnd;
+    inputs.phase := Bits.vdd;
+    inputs.valid := Bits.vdd;
+    inputs.number := Bits.of_int ~width:32 id;
+    inputs.lower := Bits.of_int ~width:32 0;
+    inputs.upper := Bits.of_int ~width:32 0;
+    cycle_count := !cycle_count + 1;
+    Cyclesim.cycle sim;
+    if verbose then
+      Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
+  in
+
+  List.iter (fun range -> step_range ~range:range) ranges;
+  List.iter (fun id -> step_id ~id:id) ids;
+  for _ = 1 to 200 do
     inputs.clear := Bits.gnd;
     inputs.phase := Bits.vdd;
     inputs.valid := Bits.gnd;
@@ -146,22 +166,23 @@ let testbench input verbose =
     inputs.upper := Bits.of_int ~width:32 0;
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
-    Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   done;
   Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part1_count)) (Bits.to_int !(outputs.part2_count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
-let test_input = [
+let test_ranges = [
   (3, 5);
   (10, 14);
   (16, 20);
-  (12, 18);
+  (12, 18)
 ]
+
+let test_numbers = [1; 5; 8; 11; 17; 32]
 
 let%expect_test "test small numbers" =
     (* Construct the simulation and get its input and output ports. *)
-    testbench test_input true;
+    testbench test_ranges test_numbers true;
     [%expect {|
       part1_count=1, part2_count=3
       part1_count=2, part2_count=8
