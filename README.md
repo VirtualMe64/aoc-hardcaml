@@ -74,7 +74,7 @@ My solution uses a chain of processing elements, each capable of storing one ran
 
 During the ID phase, each number passes through the chain. If a processor's stored range contains the number, it increments its match counter and doesn't forward the number. For part 2, we can sum the width of each valid processor -- there's no overlap since they're each disjoint!.
 
-The final outputs are computed by summing the match counts (part 1) and widths (part 2) across all processors.
+The amount of processing elements is specified in the config, but it must be at least the number of ranges in the input. This means the design is optimized for a large number of ids rather than ranges, but it is very low latency in those cases.
 
 **Performance**: Executes in 1383 cycles for 1184 inputs (~n + max_ranges)
 
