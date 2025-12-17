@@ -12,17 +12,17 @@ module Make (C : Config) = struct
       ; clear  : 'a
       ; phase  : 'a
       ; valid  : 'a
-      ; number : 'a[@bits 32]
-      ; lower  :  'a[@bits 32]
-      ; upper  : 'a[@bits 32]
+      ; number : 'a[@bits 64]
+      ; lower  :  'a[@bits 64]
+      ; upper  : 'a[@bits 64]
       }
     [@@deriving hardcaml]
   end
 
   module O = struct
     type 'a t =
-      { part1_count : 'a[@bits 32]
-      ; part2_count : 'a[@bits 32]
+      { part1_count : 'a[@bits 64]
+      ; part2_count : 'a[@bits 64]
       }
     [@@deriving hardcaml]
   end
@@ -38,9 +38,9 @@ module Make (C : Config) = struct
         ; phase : 'a
         ; valid : 'a
         (* data passing signals *)
-        ; number : 'a[@bits 32]
-        ; lower  : 'a[@bits 32]
-        ; upper  : 'a[@bits 32]
+        ; number : 'a[@bits 64]
+        ; lower  : 'a[@bits 64]
+        ; upper  : 'a[@bits 64]
         }
       [@@deriving hardcaml]
     end
@@ -49,11 +49,11 @@ module Make (C : Config) = struct
       type 'a t =
         { phase  : 'a
         ; valid  : 'a
-        ; number : 'a[@bits 32]
-        ; lower  : 'a[@bits 32]
-        ; upper  : 'a[@bits 32]
-        ; width  : 'a[@bits 32]
-        ; count  : 'a[@bits 32]
+        ; number : 'a[@bits 64]
+        ; lower  : 'a[@bits 64]
+        ; upper  : 'a[@bits 64]
+        ; width  : 'a[@bits 64]
+        ; count  : 'a[@bits 64]
         }
       [@@deriving hardcaml]
     end
@@ -61,9 +61,9 @@ module Make (C : Config) = struct
     let create (i : _ I.t) =
       let smax a b = mux2 (a >=: b) a b in
       let r_sync = Reg_spec.create ~clock:i.clock ~clear:i.clear () in
-      let lower_next = wire 32 in
+      let lower_next = wire 64 in
       let lower_reg = reg r_sync lower_next ~enable:(i.valid &: (i.phase ==:. 0)) in
-      let upper_next = wire 32 in
+      let upper_next = wire 64 in
       let upper_reg = reg r_sync upper_next ~enable:(i.valid &: (i.phase ==:. 0)) in
       let valid_next = wire 1 in 
       let valid_reg = reg r_sync valid_next ~enable:(i.valid &: (i.phase ==:. 0)) in
@@ -81,7 +81,7 @@ module Make (C : Config) = struct
       upper_next <== mux2 (evicting) (i.upper) (upper_reg);
 
       (* if contained and valid, increment counter *)
-      let counter_reg = reg_fb r_sync ~enable:contained ~width:32
+      let counter_reg = reg_fb r_sync ~enable:contained ~width:64
         ~f:(fun count -> count +:. 1) in
 
       { O.phase = phase_pipe (* pass through phase *)
@@ -90,7 +90,7 @@ module Make (C : Config) = struct
       ; O.number = number_pipe (* pass through number *)
       ; O.lower = mux2 (evicting) (smax lower_reg (i.upper +:. 1)) (smax i.lower (upper_reg +:. 1))
       ; O.upper = mux2 (evicting) upper_reg i.upper
-      ; O.width = mux2 (valid_reg &: (upper_reg >=: lower_reg)) (upper_reg -: lower_reg +:. 1) (of_int ~width:32 0)
+      ; O.width = mux2 (valid_reg &: (upper_reg >=: lower_reg)) (upper_reg -: lower_reg +:. 1) (of_int ~width:64 0)
       (* ; O.width = lower_reg *)
       ; O.count = counter_reg
       }
@@ -113,10 +113,10 @@ module Make (C : Config) = struct
     {
       O.part1_count = List.fold_left (fun acc proc ->
         acc +: proc.Processor.O.count
-      ) (of_int ~width:32 0) processor_file;
+      ) (of_int ~width:64 0) processor_file;
       O.part2_count = List.fold_left (fun acc proc ->
         acc +: proc.Processor.O.width
-      ) (of_int ~width:32 0) processor_file;
+      ) (of_int ~width:64 0) processor_file;
     }
   ;;
 end
@@ -134,9 +134,9 @@ let testbench ranges ids verbose =
     inputs.clear := Bits.gnd;
     inputs.phase := Bits.gnd;
     inputs.valid := Bits.vdd;
-    inputs.number := Bits.of_int ~width:32 0;
-    inputs.lower := Bits.of_int ~width:32 (fst range);
-    inputs.upper := Bits.of_int ~width:32 (snd range);
+    inputs.number := Bits.of_int ~width:64 0;
+    inputs.lower := Bits.of_int ~width:64 (fst range);
+    inputs.upper := Bits.of_int ~width:64 (snd range);
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
     if verbose then
@@ -146,9 +146,9 @@ let testbench ranges ids verbose =
     inputs.clear := Bits.gnd;
     inputs.phase := Bits.vdd;
     inputs.valid := Bits.vdd;
-    inputs.number := Bits.of_int ~width:32 id;
-    inputs.lower := Bits.of_int ~width:32 0;
-    inputs.upper := Bits.of_int ~width:32 0;
+    inputs.number := Bits.of_int ~width:64 id;
+    inputs.lower := Bits.of_int ~width:64 0;
+    inputs.upper := Bits.of_int ~width:64 0;
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
     if verbose then
@@ -161,9 +161,9 @@ let testbench ranges ids verbose =
     inputs.clear := Bits.gnd;
     inputs.phase := Bits.vdd;
     inputs.valid := Bits.gnd;
-    inputs.number := Bits.of_int ~width:32 0;
-    inputs.lower := Bits.of_int ~width:32 0;
-    inputs.upper := Bits.of_int ~width:32 0;
+    inputs.number := Bits.of_int ~width:64 0;
+    inputs.lower := Bits.of_int ~width:64 0;
+    inputs.upper := Bits.of_int ~width:64 0;
     cycle_count := !cycle_count + 1;
     Cyclesim.cycle sim;
   done;
