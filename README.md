@@ -66,6 +66,18 @@ The circuit came together relatively quickly, but there were several hours of de
 
 **Performance** Executes in 19185 cycles (~1.007 per character)
 
+### Day 5
+
+[Problem](https://adventofcode.com/2025/day/5) | [Solution](src/Day5/hardware.ml)
+
+My solution uses a chain of processing elements, each capable of storing one range. During the range input phase, each processor either stores a new range or passes it along to the next processor in the chain. When a range with a lower bound less than or equal to the stored range arrives, it evicts the stored range and takes its place — this eviction process ensures ranges end up both sorted and disjoint which makes the part 2 result easy to compute.
+
+During the ID phase, each number passes through the chain. If a processor's stored range contains the number, it increments its match counter and doesn't forward the number. For part 2, we can sum the width of each valid processor -- there's no overlap since they're each disjoint!.
+
+The final outputs are computed by summing the match counts (part 1) and widths (part 2) across all processors.
+
+**Performance**: Executes in 1383 cycles for 1184 inputs (~n + max_ranges)
+
 ### Day 7
 
 [Problem](https://adventofcode.com/2025/day/7) | [Solution](src/Day4/hardware.ml)
