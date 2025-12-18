@@ -62,8 +62,8 @@ let create w h (i : _ I.t) =
     Always.(
       compile [
         sm.switch [
-          (Inputting, [
-            ram_we <-- i.valid
+          (Inputting, 
+          [ ram_we <-- i.valid
           ; ram_waddr <-- counter.value
           ; ram_wdata <-- concat_msb [
               i.valid; i.input <>:. (Char.code ' ')
@@ -77,16 +77,15 @@ let create w h (i : _ I.t) =
           ; when_ i.finished [
               sm.set_next Computing
             ]
+          ; ram_raddr_1 <-- of_int ~width:address_width 9
+          ; ram_raddr_2 <-- of_int ~width:address_width 9
           ]);
-          (Computing, [
-            (* TODO: computation *)
-            ram_we <-- gnd;
-            ram_raddr_1 <-- of_int ~width:address_width 2;
-            ram_raddr_2 <-- of_int ~width:address_width 2;
-            sm.set_next Finished
+          (Computing, (* TODO: computation *)
+          [ ram_we <-- gnd
+          ; sm.set_next Finished
           ]);
-          (Finished, [
-            ram_we <-- gnd
+          (Finished, 
+          [ ram_we <-- gnd
           ])
         ]
       ]
