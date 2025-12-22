@@ -16,7 +16,7 @@ end
 module O = struct
   type 'a t =
     { ready : 'a
-    ; count : 'a[@bits 32]
+    ; count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -59,10 +59,10 @@ let create w h (i : _ I.t) =
     let _ram_rdata_2 = ram_out.(1) in
 
     (* part 1 computation logic *)
-    let p1_total = Always.Variable.reg ~width:32 r_sync in
+    let p1_total = Always.Variable.reg ~width:64 r_sync in
     let p1_op = Always.Variable.reg ~width:1 r_sync in
-    let p1_bcd_scratch = Always.Variable.reg ~width:32 r_sync in
-    let p1_column_scratch = Always.Variable.reg ~width:32 r_sync in
+    let p1_bcd_scratch = Always.Variable.reg ~width:64 r_sync in
+    let p1_column_scratch = Always.Variable.reg ~width:64 r_sync in
     let p1_counter = Always.Variable.reg ~width:(address_width + 1) r_sync in
     let p1_phase = Always.Variable.reg ~width:2 r_sync in
     let p1_finished = Always.Variable.reg ~width:1 r_sync in
@@ -85,10 +85,10 @@ let create w h (i : _ I.t) =
               counter <-- counter.value +:. 1
             ]
           ; when_ i.finished [
-              p1_total <-- of_int ~width:32 0
+              p1_total <-- of_int ~width:64 0
             ; p1_op <-- of_int ~width:1 0
-            ; p1_bcd_scratch <-- of_int ~width:32 0
-            ; p1_column_scratch <-- of_int ~width:32 0
+            ; p1_bcd_scratch <-- of_int ~width:64 0
+            ; p1_column_scratch <-- of_int ~width:64 0
             ; p1_counter <-- of_int ~width:(address_width + 1) 0
             ; p1_phase <-- of_int ~width:2 0
             ; p1_finished <-- of_int ~width:1 0
@@ -114,8 +114,8 @@ let create w h (i : _ I.t) =
                 ; p1_phase <-- of_int ~width:2 1
                 ; p1_next_addr <-- p1_next_addr.value -:. (w * (h - 1))
                 ; ram_raddr_1 <-- uresize (p1_next_addr.value -:. (w * (h - 1))) address_width
-                ; p1_bcd_scratch <-- of_int ~width:32 0
-                ; p1_column_scratch <-- mux2 (select ram_rdata_1 4 4) (of_int ~width:32 0) (of_int ~width:32 1)
+                ; p1_bcd_scratch <-- of_int ~width:64 0
+                ; p1_column_scratch <-- mux2 (select ram_rdata_1 4 4) (of_int ~width:64 0) (of_int ~width:64 1)
                 ; p1_counter <-- of_int ~width:(address_width + 1) 0
                 ] [
                   p1_next_addr <-- p1_next_addr.value +:. 1;
@@ -124,9 +124,9 @@ let create w h (i : _ I.t) =
               ] [
               if_ (select ram_rdata_1 7 5 ==:. 0b110) [ (* number *)
                 p1_bcd_scratch <-- (uresize 
-                  ((p1_bcd_scratch.value) *: (of_int ~width:32 10))
-                  32) +:
-                  (uresize (select ram_rdata_1 3 0) 32)
+                  ((p1_bcd_scratch.value) *: (of_int ~width:64 10))
+                  64) +:
+                  (uresize (select ram_rdata_1 3 0) 64)
               ; p1_next_addr <-- p1_next_addr.value +:. 1
               ; ram_raddr_1 <-- uresize (p1_next_addr.value +:. 1) address_width
               ; p1_counter <-- p1_counter.value +:. 1
@@ -142,11 +142,11 @@ let create w h (i : _ I.t) =
                     if_ (p1_op.value ==:. 1) [ (* addition *)
                       p1_column_scratch <-- p1_column_scratch.value +: p1_bcd_scratch.value
                     ] [ (* multiplication *)
-                      p1_column_scratch <-- uresize (p1_column_scratch.value *: p1_bcd_scratch.value) 32
+                      p1_column_scratch <-- uresize (p1_column_scratch.value *: p1_bcd_scratch.value) 64
                     ]
                   ; p1_next_addr <-- (p1_next_addr.value +:. w) -: p1_counter.value
                   ; ram_raddr_1 <-- uresize ((p1_next_addr.value +:. w) -: p1_counter.value) address_width
-                  ; p1_bcd_scratch <-- of_int ~width:32 0
+                  ; p1_bcd_scratch <-- of_int ~width:64 0
                   ; p1_phase <-- of_int ~width:2 1
                   ; p1_counter <-- of_int ~width:(address_width + 1) 0
                   ] [
@@ -166,7 +166,7 @@ let create w h (i : _ I.t) =
       ]
     );
     {O.ready = sm.is Finished;
-     count = uresize p1_total.value 32
+     count = uresize p1_total.value 64
     }
 ;;
 
@@ -209,7 +209,8 @@ let testbench input _verbose =
       inputs.valid := Bits.gnd;
       inputs.input := Bits.of_int ~width:8 0;
       cycle_count := !cycle_count + 1;
-      Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
+      if _verbose then
+        Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
       Cyclesim.cycle sim;
     done;
   Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
@@ -217,10 +218,10 @@ let testbench input _verbose =
 ;;
 
 let test_input = [
-  "123 328  51 64  ";
-  " 45 64  387 23  ";
-  "  6 98  215 314 ";
-  "*   +   *   +   ";  
+  "123 328  51 64 \n";
+  " 45 64  387 23 \n";
+  "  6 98  215 314\n";
+  "*   +   *   +  \n";  
 ]
 
 let%expect_test "test circuit" =
