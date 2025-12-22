@@ -31,7 +31,7 @@ This was my first time making any non-trivial Hardcaml circuit, so I spent a lot
 
 [Problem](https://adventofcode.com/2025/day/2) | [Solution](src/Day2/hardware.ml)
 
-I used a multiphase approach for day two. After reciving the input, I extract the decimal digits using the Double Dabble algorithm, check for equality among all relevant sets of chunks, and then increment with a ripple add operation.
+I used a multiphase approach for day two. After receiving the input, I extract the decimal digits using the Double Dabble algorithm, check for equality among all relevant sets of chunks, and then increment with a ripple add operation.
 
 Implementing the equality check was the most interesting part of this circuit. For each length 1 through 16, I use a recursive function to find the factors. I then use two left fold operations to first check if all of the chunks have the same value for a given chunk size, then to see if any chunk size meets the requirement for each length. These are all computed in parallel, then a mux with the number of digits is used to get the result.
 
@@ -57,7 +57,7 @@ I'm also quite happy with how this approach generalized -- part 1 and part 2 use
 
 Day 4 was the first problem where I only decided to solve one of the parts. I may come back to this with a brute force approach for part 2, since my optimized approach seems difficult to translate to an FPGA.
 
-Since the first part only has dependencies of length `w` for a `w x h` grid, I was able to create a circuit which only uses `O(w)` memory and about `w * h` cycles. The input to the circuit is a left to right, top to bottom stream of characters straight from the file. The core idea is to allocate a size `w` ram which stores the state of the previous `w` cells, specifically 1 bit for if it's occupied and 4 bits for the known number of neighbors. Each new cell we read both updates it's earlier neighbors and reads from them to determine it's initial number of neighbors.
+Since the first part only has dependencies of length `w` for a `w x h` grid, I was able to create a circuit which only uses `O(w)` memory and about `w * h` cycles. The input to the circuit is a left to right, top to bottom stream of characters straight from the file. The core idea is to allocate a size `w` ram which stores the state of the previous `w` cells, specifically 1 bit for if it's occupied and 4 bits for the known number of neighbors. Each new cell we read both updates its earlier neighbors and reads from them to determine its initial number of neighbors.
 
 ![System diagram](images/day4.png)
 
@@ -94,13 +94,13 @@ Both parts utilize 64-bit scratch registers to accumulate intermediate values an
 
 ### Day 7
 
-[Problem](https://adventofcode.com/2025/day/7) | [Solution](src/Day4/hardware.ml)
+[Problem](https://adventofcode.com/2025/day/7) | [Solution](src/Day7/hardware.ml)
 
-My solution uses an array of processing elements  with width equal to the width of the input. Each processing element passes state with it's neighbor, and the circuit processes an entire row of input at a time. This makes the whole circuit both quite elegant to write in Hardcaml and very low latency -- achieving a one cycle per row of input. This may beat day 3 for my favorite solution so far!
+My solution uses an array of processing elements  with width equal to the width of the input. Each processing element passes state with its neighbor, and the circuit processes an entire row of input at a time. This makes the whole circuit both quite elegant to write in Hardcaml and very low latency -- achieving a one cycle per row of input. This may beat day 3 for my favorite solution so far!
 
 ![System diagram](images/day7.png)
 
-Each processing element represents a column, and stores the number of paths reaching the column and the number of splits which occured at the column The update logic is pretty simple:
+Each processing element represents a column, and stores the number of paths reaching the column and the number of splits which occurred at the column The update logic is pretty simple:
 - Add input from neighbors to number of paths
 - If the input is a `^`:
     - Output number of paths to neighbors
@@ -121,7 +121,7 @@ Assuming you already have OCaml installed, create a switch with `opam switch cre
 You can run the tests for a specific day using `dune test`. For example, to test Day 1:
 
 ```bash
-dune test src/Day1# aoc-hardcaml
+dune test src/Day1
 ```
 
 ### Running the solution
