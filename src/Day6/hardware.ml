@@ -16,7 +16,8 @@ end
 module O = struct
   type 'a t =
     { ready : 'a
-    ; count : 'a[@bits 64]
+    ; part_1_count : 'a[@bits 64]
+    ; part_2_count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -56,7 +57,7 @@ let create w h (i : _ I.t) =
         ()
     in
     let ram_rdata_1 = ram_out.(0) in
-    let _ram_rdata_2 = ram_out.(1) in
+    let ram_rdata_2 = ram_out.(1) in
 
     (* part 1 computation logic *)
     let p1_total = Always.Variable.reg ~width:64 r_sync in
@@ -67,6 +68,14 @@ let create w h (i : _ I.t) =
     let p1_phase = Always.Variable.reg ~width:2 r_sync in
     let p1_finished = Always.Variable.reg ~width:1 r_sync in
     let p1_next_addr = Always.Variable.reg ~width:(address_width + 1) r_sync in
+
+    (* part 2 computation logic *)
+    let p2_total = Always.Variable.reg ~width:64 r_sync in
+    let p2_op = Always.Variable.reg ~width:1 r_sync in
+    let p2_bcd_scratch = Always.Variable.reg ~width:64 r_sync in
+    let p2_row_scratch = Always.Variable.reg ~width:64 r_sync in
+    let p2_finished = Always.Variable.reg ~width:1 r_sync in
+    let p2_next_addr = Always.Variable.reg ~width:(address_width + 1) r_sync in
 
     let sm = Always.State_machine.create (module States) ~enable:vdd r_sync in
     Always.(
@@ -94,16 +103,23 @@ let create w h (i : _ I.t) =
             ; p1_finished <-- of_int ~width:1 0
             ; p1_next_addr <-- of_int ~width:(address_width + 1) (w * (h - 1))
             ; ram_raddr_1 <-- of_int ~width:address_width (w * (h - 1))
+
+            ; p2_total <-- of_int ~width:64 0
+            ; p2_op <-- of_int ~width:1 0
+            ; p2_bcd_scratch <-- of_int ~width:64 0
+            ; p2_row_scratch <-- of_int ~width:64 0
+            ; p2_finished <-- of_int ~width:1 0
+            ; p2_next_addr <-- of_int ~width:(address_width + 1) (w * (h - 1))
+            ; ram_raddr_2 <-- of_int ~width:address_width (w * (h - 1))
             ; sm.set_next Computing
             ]
           ]);
           (Computing, (* TODO: computation *)
           [ 
             ram_we <-- gnd
-          ; ram_raddr_2 <-- of_int ~width:address_width 9
           ; when_ (p1_finished.value) [
-            sm.set_next Finished
-          ]
+              sm.set_next Finished
+            ]
           ; when_ (~: (p1_finished.value)) [
               when_ ((p1_next_addr.value) >=:. (h * w)) [
                 p1_finished <-- vdd
@@ -158,6 +174,50 @@ let create w h (i : _ I.t) =
               ]
             ]
           ]
+          ; when_ (~: (p2_finished.value)) [
+              when_ ((p2_next_addr.value) >=:. (h * w)) [
+                p2_finished <-- vdd
+              ]
+            ; if_ (p2_next_addr.value >=:. (w * (h - 1))) [ (* bottom row *)
+                if_ ((select ram_rdata_2 7 5 ==:. 0b111) |: ((p2_next_addr.value) >=:. (h * w))) [ (* new op *)
+                  p2_op <-- select ram_rdata_2 4 4
+                ; if_ (select ram_rdata_2 4 4 ==:. 1) [ (* addition *)
+                    p2_row_scratch <-- of_int ~width:64 0
+                  ] [ (* multiplication *)
+                    p2_row_scratch <-- of_int ~width:64 1
+                  ]
+                ; p2_total <-- p2_total.value +: p2_row_scratch.value
+                ; p2_bcd_scratch <-- of_int ~width:64 0
+                ; p2_next_addr <-- p2_next_addr.value -:. (w * (h - 1))
+                ; ram_raddr_2 <-- uresize (p2_next_addr.value -:. (w * (h - 1))) address_width
+                ] [ (* end of column *)
+                  if_ (p2_op.value ==:. 1) [ (* addition *)
+                    p2_row_scratch <-- p2_row_scratch.value +: p2_bcd_scratch.value
+                  ] [ (* multiplication *)
+                    when_ (p2_bcd_scratch.value <>:. 0) [
+                      p2_row_scratch <-- uresize (p2_row_scratch.value *: p2_bcd_scratch.value) 64
+                    ]
+                  ]
+                ; p2_bcd_scratch <-- of_int ~width:64 0
+                ; p2_next_addr <-- p2_next_addr.value -:. (w * (h - 1))
+                ; ram_raddr_2 <-- uresize (p2_next_addr.value -:. (w * (h - 1))) address_width
+                ]
+              ] [
+                when_ (select ram_rdata_2 7 5 ==:. 0b110) [ (* number*)
+                  p2_bcd_scratch <-- (uresize 
+                    ((p2_bcd_scratch.value) *: (of_int ~width:64 10))
+                    64) +:
+                    (uresize (select ram_rdata_2 3 0) 64)
+                ]
+              ; if_ (p2_next_addr.value <:. (w * (h - 2))) [ (* not penultimate row *)
+                  p2_next_addr <-- p2_next_addr.value +:. w
+                ; ram_raddr_2 <-- uresize (p2_next_addr.value +:. w) address_width
+                ] [
+                  p2_next_addr <-- p2_next_addr.value +:. (w + 1)
+                ; ram_raddr_2 <-- uresize (p2_next_addr.value +:. (w + 1)) address_width
+                ]
+              ]
+            ]
           ]);
           (Finished, 
           [ ram_we <-- gnd
@@ -166,7 +226,8 @@ let create w h (i : _ I.t) =
       ]
     );
     {O.ready = sm.is Finished;
-     count = uresize p1_total.value 64
+     O.part_1_count = uresize p1_total.value 64;
+     O.part_2_count = uresize p2_total.value 64
     }
 ;;
 
@@ -210,10 +271,10 @@ let testbench input _verbose =
       inputs.input := Bits.of_int ~width:8 0;
       cycle_count := !cycle_count + 1;
       if _verbose then
-        Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
+        Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part_1_count)) (Bits.to_int !(outputs.part_2_count));
       Cyclesim.cycle sim;
     done;
-  Stdio.printf "part1_count=%d\n" (Bits.to_int !(outputs.count));
+  Stdio.printf "part1_count=%d, part2_count=%d\n" (Bits.to_int !(outputs.part_1_count)) (Bits.to_int !(outputs.part_2_count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
 
