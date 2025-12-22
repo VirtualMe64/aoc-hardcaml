@@ -78,6 +78,20 @@ The amount of processing elements is specified in the config, but it must be at 
 
 **Performance**: Executes in 1383 cycles for 1184 inputs (~n + max_ranges)
 
+### Day 6
+
+[Problem](https://adventofcode.com/2025/day/6) | [Solution](src/Day6/hardware.ml)
+
+For Day 6, I implemented a store-then-process architecture. The circuit first streams the entire input grid into a dual-port RAM, pre-decoding the characters into flags (valid, is_op, numeric value) as they are stored. This simplifies the subsequent logic by removing the need for repeated ASCII decoding.
+
+Once the input is fully loaded, two independent state machines run in parallel to solve Part 1 and Part 2 simultaneously. The RAM's two read ports allow both logic blocks to access the grid data without contention.
+*   **Part 1** scans the grid to identify columns, accumulating BCD digits vertically and applying the operator found at the bottom.
+*   **Part 2** traverses the grid to handle the "cephalopod math" rules, constructing numbers from vertical digits.
+
+Both parts utilize 64-bit scratch registers to accumulate intermediate values and the grand totals. This approach proved to be very efficient, effectively pipelining the two parts and utilizing the memory bandwidth fully.
+
+**Performance**: Executes in 37722 cycles (~2.01 per character).
+
 ### Day 7
 
 [Problem](https://adventofcode.com/2025/day/7) | [Solution](src/Day4/hardware.ml)
