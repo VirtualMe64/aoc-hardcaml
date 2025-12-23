@@ -289,72 +289,72 @@ let%expect_test "test circuit" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=0
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33210
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=33700
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277155
-      part1_count=4277556
-      part1_count=4277556
-      part1_count=4277556
-      part1_count=4277556
-      part1_count=4277556
-      part1_count=4277556
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=0, part2_count=0
+      part1_count=33210, part2_count=0
+      part1_count=33210, part2_count=0
+      part1_count=33210, part2_count=0
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33210, part2_count=8544
+      part1_count=33700, part2_count=8544
+      part1_count=33700, part2_count=8544
+      part1_count=33700, part2_count=8544
+      part1_count=33700, part2_count=8544
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=33700, part2_count=9169
+      part1_count=4277155, part2_count=9169
+      part1_count=4277155, part2_count=9169
+      part1_count=4277155, part2_count=9169
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277155, part2_count=3262769
+      part1_count=4277556, part2_count=3262769
+      part1_count=4277556, part2_count=3262769
+      part1_count=4277556, part2_count=3262769
+      part1_count=4277556, part2_count=3262769
+      part1_count=4277556, part2_count=3263827
+      part1_count=4277556, part2_count=3263827
       Total cycles: 132
       |}]
