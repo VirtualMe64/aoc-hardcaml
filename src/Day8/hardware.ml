@@ -17,7 +17,7 @@ end
 module O = struct
   type 'a t =
     { ready : 'a (* whether output is ready *)
-    ; count : 'a[@bits 32]
+    ; count : 'a[@bits 64]
     }
   [@@deriving hardcaml]
 end
@@ -29,6 +29,7 @@ module States = struct
     | PrimsOuterLoop
     | PrimsLoop1
     | PrimsLoop2
+    | FindingMax
     | Finished
   [@@deriving sexp_of, compare ~localize, enumerate]
 end
@@ -84,21 +85,24 @@ let create n (i : _ I.t) =
   let min_key = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
   let min_idx_value = Always.Variable.reg ~width:96 ~enable:vdd r_sync in
 
+  let max_output = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+  let max_norm = Always.Variable.reg ~width:64 ~enable:vdd r_sync in
+
   let values_ram = create_ram n 96 i in
   let in_mst_ram = create_ram n 1 i in
   let key_ram = create_ram n 64 i in (* first bit valid, next 63 for key *)
-  let parent_ram = create_ram n 16 i in (* first bit valid, next 15 for value *)
+  let parent_ram = create_ram n 96 i in
 
   let norm value1 value2 =
     let abs_diff a b =
       mux2 (a <: b) (b -: a) (a -: b)
     in
-    let x1 = select value1 31 0 in
-    let x2 = select value2 31 0 in
+    let x1 = select value1 95 64 in
+    let x2 = select value2 95 64 in
     let y1 = select value1 63 32 in
     let y2 = select value2 63 32 in
-    let z1 = select value1 95 64 in
-    let z2 = select value2 95 64 in
+    let z1 = select value1 31 0 in
+    let z2 = select value2 31 0 in
     let dx = uresize (abs_diff x1 x2) 32 in
     let dy = uresize (abs_diff y1 y2) 32 in
     let dz = uresize (abs_diff z1 z2) 32 in
@@ -135,9 +139,12 @@ let create n (i : _ I.t) =
         ]);
         (PrimsOuterLoop, [
           if_ (outer_loop_index.value ==:. n) [
-            sm.set_next Finished
+            sm.set_next FindingMax
+          ; inner_loop_index <--. 1
+          ; values_ram.ram_raddr <--. 1
+          ; parent_ram.ram_raddr <--. 1
           ] [  
-            outer_loop_index <-- outer_loop_index.value +: of_int ~width:32 1
+            outer_loop_index <-- outer_loop_index.value +:. 1
           ; min_idx <-- of_int ~width:32 0
           ; min_key <-- of_int ~width:64 0
           ; inner_loop_index <--. 0
@@ -164,6 +171,7 @@ let create n (i : _ I.t) =
           ; key_ram.ram_raddr <-- uresize (inner_loop_index.value +:. 1) address_width
           ; in_mst_ram.ram_raddr <-- uresize (inner_loop_index.value +:. 1) address_width
           ; when_ ((in_mst_ram.ram_rdata ==:. 0) &:
+              (select key_ram.ram_rdata 63 63 ==:. 1) &:
               ((key_ram.ram_rdata <: min_key.value) |: (select min_key.value 63 63 ==:. 0))) [
               min_key <-- key_ram.ram_rdata
             ; min_idx <-- inner_loop_index.value
@@ -188,7 +196,21 @@ let create n (i : _ I.t) =
             ; key_ram.ram_wdata <-- norm values_ram.ram_rdata min_idx_value.value
             ; parent_ram.ram_we <--. 1
             ; parent_ram.ram_waddr <-- uresize inner_loop_index.value address_width
-            ; parent_ram.ram_wdata <-- uresize min_idx.value 16 
+            ; parent_ram.ram_wdata <-- min_idx_value.value
+            ]
+          ]
+        ]);
+        (FindingMax, [
+          if_ (inner_loop_index.value ==:. n) [
+            sm.set_next Finished
+          ] [
+            sm.set_next FindingMax
+          ; inner_loop_index <-- inner_loop_index.value +:. 1
+          ; values_ram.ram_raddr <-- uresize (inner_loop_index.value +:. 1) address_width
+          ; parent_ram.ram_raddr <-- uresize (inner_loop_index.value +:. 1) address_width
+          ; when_ ((norm (values_ram.ram_rdata) (parent_ram.ram_rdata)) >: max_norm.value) [
+              max_norm <-- (norm (values_ram.ram_rdata) (parent_ram.ram_rdata))
+            ; max_output <-- (select (values_ram.ram_rdata) 95 64) *: (select (parent_ram.ram_rdata) 95 64)
             ]
           ]
         ]);
@@ -199,7 +221,7 @@ let create n (i : _ I.t) =
     ]
   );
   { O.ready = sm.is Finished
-  ; O.count = uresize key_ram.ram_rdata 32
+  ; O.count = max_output.value
   }
 ;;
 
@@ -243,11 +265,7 @@ let testbench input _verbose =
       inputs.valid := Bits.gnd;
       cycle_count := !cycle_count + 1;
       Cyclesim.cycle sim;
-      if _verbose then
-        Stdio.printf "part2_count=%d\n" (Bits.to_int !(outputs.count));
     done;
-  Cyclesim.cycle sim;  
-  Cyclesim.cycle sim;
   Stdio.printf "part2_count=%d\n" (Bits.to_int !(outputs.count));
   Stdio.printf "Total cycles: %d\n" !cycle_count
 ;;
@@ -279,16 +297,6 @@ let%expect_test "test circuit" =
     (* Construct the simulation and get its input and output ports. *)
     testbench test_input true;
     [%expect {|
-      part1_count=0
-      part1_count=4
-      part1_count=6
-      part1_count=7
-      part1_count=7
-      part1_count=8
-      part1_count=9
-      part1_count=9
-      part1_count=10
-      part1_count=10
-      part1_count=13
-      Total cycles: 113
+      part2_count=25272
+      Total cycles: 903
       |}]
