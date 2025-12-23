@@ -115,9 +115,9 @@ Then the part 1 output is the sum of splits across each processing element, and 
 
 [Problem](https://adventofcode.com/2025/day/8) | [Solution](src/Day8/hardware.ml)
 
-For Day 8, I only solved the second part in hardcaml. The problem essentially asks to find the last edge added to an MST in Kruskals, for a fully connected graph. Since this edge must be unique since the problem doesn't give us tie breaker logic, we are able to use Prim's instead to construct the MST and find the largest edge after. This is more efficient since the graph is fully connected, and also much easier to represnt in hardware (we only need a few rams with |V| entries per).
+For Day 8, I only solved the second part in hardcaml. The problem essentially asks to find the last edge added to an MST in Kruskals, for a fully connected graph. Since this edge must be unique since the problem doesn't give us tie breaker logic, we are able to use Prim's instead to construct the MST and find the largest edge after. This is more efficient since the graph is fully connected, and also much easier to represent in hardware (we only need a few rams with |V| entries per).
 
-Since the edge weights are just distances between vertices, I have a circuit to compute the norm instead (avoidng a costly square root) meaning we don't even need to store edge weights. This day was my most direct translation from [my Python solution](src/Day8/reference.py), but I'm still happy with it overall since the switch from Kruskals to Prim's makes it much neater.
+Since the edge weights are just distances between vertices, I have a circuit to compute the norm instead (avoiding a costly square root) meaning we don't even need to store edge weights. This day was my most direct translation from [my Python solution](src/Day8/reference.py), but I'm still happy with it overall since the switch from Kruskals to Prim's makes it much neater.
 
 **Performance**: Executes in 2005003 cycles (~2005 per junction, ~2.005 per 'edge')
 
