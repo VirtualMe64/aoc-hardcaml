@@ -15,6 +15,26 @@ The project is structured with each day's circuit in its own folder within `src/
     *   `main.ml`: Handles input parsing and runs the hardware simulation against the input.
 *   `inputs/`: Contains the input files for the challenges.
 
+## Usage
+
+### Setup
+Assuming you already have OCaml installed, create a switch with `opam switch create hardcaml 5.2.1` then run `opam install hardcaml ppx_hardcaml hardcaml_waveterm`
+
+### Running Tests
+
+You can run the ests for a specific day using `dune test`. For example, to test Day 1:
+
+```bash
+dune test src/Day1
+```
+
+### Running the solution
+To run the solution against the input file, use `dune exec`. For example, for Day 1:
+```bash
+dune build
+dune exec day1
+```
+
 ## Solutions
 
 ### Day 1
@@ -120,23 +140,3 @@ For Day 8, I only solved the second part in hardcaml. The problem essentially as
 Since the edge weights are just distances between vertices, I have a circuit to compute the norm instead (avoiding a costly square root) meaning we don't even need to store edge weights. This day was my most direct translation from [my Python solution](src/Day8/reference.py), but I'm still happy with it overall since the switch from Kruskals to Prim's makes it much neater.
 
 **Performance**: Executes in 2005003 cycles (~2005 per junction, ~2.005 per 'edge')
-
-## Usage
-
-### Setup
-Assuming you already have OCaml installed, create a switch with `opam switch create hardcaml 5.2.1` then run `opam install hardcaml ppx_hardcaml hardcaml_waveterm`
-
-### Running Tests
-
-You can run the tests for a specific day using `dune test`. For example, to test Day 1:
-
-```bash
-dune test src/Day1
-```
-
-### Running the solution
-To run the solution against the input file, use `dune exec`. For example, for Day 1:
-```bash
-dune build
-dune exec day1
-```
