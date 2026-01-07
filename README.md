@@ -11,7 +11,7 @@ I have never used OCaml or Hardcaml before, though I do have some experience wit
 The project is structured with each day's circuit in its own folder within `src/`.
 
 *   `src/DayX/`: Contains the solution for Day X.
-    *   `hardware.ml`: The actual hardware implementation of the circuit. Also includes tests for the circuit
+    *   `hardware.ml`: The actual hardware implementation of the circuit, alongside the testbench. Also includes unit tests for the circuit
     *   `main.ml`: Handles input parsing and runs the hardware simulation against the input.
 *   `inputs/`: Contains the input files for the challenges.
 
