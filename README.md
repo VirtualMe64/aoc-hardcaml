@@ -22,7 +22,7 @@ Assuming you already have OCaml installed, create a switch with `opam switch cre
 
 ### Running Tests
 
-You can run the ests for a specific day using `dune test`. For example, to test Day 1:
+You can run the tests for a specific day using `dune test`. For example, to test Day 1:
 
 ```bash
 dune test src/Day1
@@ -64,6 +64,8 @@ To solve part 1, I use the same logic but explicitly checking for a chunk size o
 [Problem](https://adventofcode.com/2025/day/3) | [Solution](src/Day3/hardware.ml)
 
 This is my favorite circuit so far! My reference python implementation iterated over each of the output digits for each input character, which would be somewhat inefficient and didn't feel in the spirit of an FPGA. Instead, I initialize a processor for each digit, and the characters are passed through them from the MSB to the LSB. This means with sufficiently long input strings we'd approach one cycle per character!
+
+Each processor will check if the next number is greater than the currently stored number. If it is, it replaces the current number and sends a signal to zero out all later digits. It also contains edge case logic for the last few numbers in the stream.
 
 ![System diagram](images/day3.png)
 
